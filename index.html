@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>병원 공간기획 · 3D 재배치 스튜디오 v2</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#161b22; --panel2:#1c232d; --line:#2a323d;
+    --txt:#e6edf3; --muted:#9aa7b4; --accent:#4c8dff; --danger:#ff5d5d; --ok:#39d98a; --up:#39d98a; --down:#ff6b6b;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;height:100%;font-family:'Malgun Gothic','Apple SD Gothic Neo',system-ui,sans-serif;background:var(--bg);color:var(--txt);overflow:hidden;}
+  button{font-family:inherit;cursor:pointer;}
+  .app{display:grid;grid-template-columns:250px 1fr 330px;grid-template-rows:48px 1fr;height:100%;}
+  header{grid-column:1/4;display:flex;align-items:center;gap:8px;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--line);overflow-x:auto;}
+  header .logo{font-weight:700;font-size:14px;letter-spacing:-.3px;white-space:nowrap;}
+  header .logo span{color:var(--accent);}
+  .tbtn{background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:6px 10px;border-radius:7px;font-size:12px;white-space:nowrap;}
+  .tbtn:hover{border-color:var(--accent);}
+  .tbtn.primary{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .tbtn.on{background:#f5b642;border-color:#f5b642;color:#0e1116;}
+  .sep{width:1px;height:22px;background:var(--line);margin:0 2px;}
+  .spacer{flex:1;}
+  aside.left{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;}
+  aside.left .head{padding:11px 12px;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;}
+  .hist{flex:1;overflow:auto;padding:8px;}
+  .hitem{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:9px 10px;margin-bottom:7px;cursor:pointer;}
+  .hitem:hover{border-color:var(--accent);}
+  .hitem .t{font-size:12.5px;font-weight:600;margin-bottom:3px;}
+  .hitem .d{font-size:10.5px;color:var(--muted);}
+  main{position:relative;min-height:0;background:radial-gradient(circle at 50% 30%,#1a2230,#0b0e13);}
+  #c{width:100%;height:100%;display:block;}
+  .floorbar{position:absolute;left:12px;top:12px;background:rgba(22,27,34,.9);border:1px solid var(--line);border-radius:9px;padding:8px;backdrop-filter:blur(6px);max-width:200px;}
+  .floorbar .ttl{font-size:11px;color:var(--muted);margin-bottom:6px;}
+  .frow{display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+  .frow button.fsel{flex:1;text-align:left;background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:5px 8px;border-radius:6px;font-size:12px;}
+  .frow button.fsel.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .frow .x{background:transparent;border:none;color:var(--muted);font-size:14px;padding:2px 4px;}
+  .legend{position:absolute;right:12px;bottom:12px;background:rgba(22,27,34,.9);border:1px solid var(--line);border-radius:9px;padding:10px;font-size:11px;max-width:230px;}
+  .legend .li{display:flex;align-items:center;gap:7px;margin:3px 0;cursor:pointer;}
+  .legend .sw{width:13px;height:13px;border-radius:3px;flex:none;}
+  .hint{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);font-size:11px;color:var(--muted);background:rgba(0,0,0,.45);padding:5px 12px;border-radius:20px;text-align:center;}
+  .drawbar{position:absolute;left:50%;top:54px;transform:translateX(-50%);background:#f5b642;color:#0e1116;font-weight:600;font-size:12px;padding:7px 12px;border-radius:8px;display:flex;gap:8px;align-items:center;z-index:5;}
+  .drawbar button{background:#0e1116;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:12px;}
+  aside.right{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:14px;min-height:0;}
+  .sec{margin-bottom:16px;}
+  .sec h3{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:0 0 8px;}
+  label{display:block;font-size:11px;color:var(--muted);margin:8px 0 3px;}
+  input[type=text],input[type=number],select,textarea{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:7px 8px;font-size:12.5px;font-family:inherit;}
+  textarea{resize:vertical;min-height:52px;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .memohint{font-size:10.5px;color:var(--muted);text-align:right;margin-top:2px;}
+  .del{background:transparent;border:1px solid var(--danger);color:var(--danger);width:100%;padding:8px;border-radius:7px;font-size:12.5px;margin-top:10px;}
+  .del:hover{background:var(--danger);color:#fff;}
+  .empty{color:var(--muted);font-size:12.5px;line-height:1.6;}
+  .chk{background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:9px;font-size:11.5px;line-height:1.5;margin-bottom:6px;}
+  .chk.pass{border-left:3px solid var(--ok);}
+  .chk.warn{border-left:3px solid #f5b642;}
+  .chk .h{font-weight:600;margin-bottom:2px;}
+  .chk .n{color:var(--muted);font-size:10.5px;}
+  .badge{font-size:10px;padding:2px 6px;border-radius:10px;background:var(--panel);border:1px solid var(--line);color:var(--muted);}
+  .stat{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px dashed var(--line);}
+  .hidden{display:none !important;}
+  /* 좌측 탭 */
+  .tabs{display:flex;border-bottom:1px solid var(--line);}
+  .tabs button{flex:1;background:transparent;border:none;color:var(--muted);padding:9px 4px;font-size:11.5px;border-bottom:2px solid transparent;}
+  .tabs button.active{color:var(--txt);border-bottom-color:var(--accent);}
+  .pane{flex:1;overflow:auto;padding:8px;min-height:0;}
+  .catgrp{margin-bottom:6px;}
+  .catgrp .ch{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:5px 6px;cursor:pointer;border-radius:6px;}
+  .catgrp .ch:hover{background:var(--panel2);}
+  .catgrp .sw{width:12px;height:12px;border-radius:3px;flex:none;}
+  .catgrp .cnt{margin-left:auto;font-size:10.5px;color:var(--muted);}
+  .sitem{font-size:11.5px;padding:4px 8px 4px 26px;color:var(--muted);cursor:pointer;border-radius:5px;display:flex;justify-content:space-between;gap:6px;}
+  .sitem:hover{background:var(--panel2);color:var(--txt);}
+  .sitem.sel{color:var(--accent);}
+  .chatlog{flex:1;overflow:auto;padding:9px;display:flex;flex-direction:column;gap:7px;}
+  .msg{padding:7px 9px;border-radius:9px;font-size:12px;line-height:1.45;max-width:93%;white-space:pre-wrap;}
+  .msg.user{background:var(--accent);color:#fff;align-self:flex-end;}
+  .msg.sys{background:var(--panel2);border:1px solid var(--line);align-self:flex-start;}
+  .chatin{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line);}
+  .chatin textarea{min-height:40px;height:40px;}
+  .lawlink{display:block;font-size:11.5px;color:var(--accent);text-decoration:none;padding:4px 0;border-bottom:1px dashed var(--line);}
+  .lawlink:hover{text-decoration:underline;}
+  .pathbar{position:absolute;left:50%;top:54px;transform:translateX(-50%);background:rgba(22,27,34,.96);border:1px solid var(--line);color:var(--txt);font-size:12px;padding:8px 12px;border-radius:10px;display:flex;gap:10px;align-items:center;z-index:5;}
+  .pathbar .sw{width:20px;height:20px;border-radius:5px;border:2px solid #ffffff33;cursor:pointer;}
+  .pathbar .sw.sel{border-color:#fff;}
+  .pathbar select{width:auto;padding:4px 6px;}
+  .pathbar button{background:#0e1116;color:#fff;border:1px solid var(--line);padding:4px 10px;border-radius:6px;}
+  .titleovl{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:4;}
+  .titleovl input{background:rgba(22,27,34,.85);border:1px solid var(--line);color:var(--txt);text-align:center;font-size:15px;font-weight:700;padding:5px 16px;border-radius:8px;width:360px;}
+  /* 모달 */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;}
+  .modal{background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(860px,94vw);max-height:88vh;overflow:auto;padding:20px;}
+  .modal h2{margin:0 0 4px;font-size:17px;}
+  .modal .sub{color:var(--muted);font-size:12px;margin-bottom:14px;}
+  .modal .close{float:right;background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:7px;padding:5px 10px;}
+  table.at{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.at th,table.at td{border-bottom:1px solid var(--line);padding:7px 9px;text-align:right;}
+  table.at th:first-child,table.at td:first-child{text-align:left;}
+  table.at th{color:var(--muted);font-weight:600;font-size:11px;}
+  table.at tfoot td{font-weight:700;border-top:2px solid var(--line);}
+  .up{color:var(--up);} .down{color:var(--down);}
+  .cmpgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .pick{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .pick select{width:auto;flex:1;}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">🏥 <span>3D 재배치 스튜디오</span></div>
+    <button class="tbtn" id="btnAddFloor">＋층</button>
+    <button class="tbtn primary" id="btnAddSpace">＋공간(사각)</button>
+    <button class="tbtn" id="btnDraw">✏ 실 외곽선 그리기</button>
+    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📄 PDF 깔기<input type="file" id="pdfInput" accept="application/pdf" class="hidden"></label>
+    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📐 CAD(DXF) 깔기<input type="file" id="cadInput" accept=".dxf,.dwg" class="hidden"></label>
+    <button class="tbtn" id="btnPath">🚶 동선 그리기</button>
+    <button class="tbtn" id="btnErase">🧽 지우개</button>
+    <button class="tbtn" id="btnLabels" title="도형을 클릭해 선택한 뒤 누르면 그 공간의 이름만 표시됩니다">🏷 명칭표시</button>
+    <button class="tbtn" id="btnUndo" title="실행취소 (Ctrl+Z)">↶ 되돌리기</button>
+    <div class="sep"></div>
+    <button class="tbtn" id="btnBaseline">📌 기준안 지정</button>
+    <button class="tbtn" id="btnDelta">📊 면적 증감표</button>
+    <button class="tbtn" id="btnCompare">🆚 안 비교</button>
+    <button class="tbtn" id="btnReport">📄 보고서</button>
+    <button class="tbtn" id="btnCapture">📷 캡처</button>
+    <div class="spacer"></div>
+    <button class="tbtn" id="btnSnapshot">💾 작업 저장</button>
+    <button class="tbtn" id="btnExport">⬇JSON</button>
+    <label class="tbtn" style="margin:0;">⬆불러오기<input type="file" id="importInput" accept="application/json" class="hidden"></label>
+  </header>
+
+  <aside class="left">
+    <div class="tabs">
+      <button id="tabHist" class="active" data-tab="hist">🕘 히스토리</button>
+      <button id="tabCat" data-tab="cat">🗂 공간분류</button>
+      <button id="tabAI" data-tab="ai">🤖 AI배치</button>
+    </div>
+    <div id="paneHist" class="pane">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;"><span style="font-size:11px;color:var(--muted)">작업 히스토리</span><button class="tbtn" id="btnNewProj" style="padding:3px 8px;font-size:11px;">새 안</button></div>
+      <div id="histList"></div>
+    </div>
+    <div id="paneCat" class="pane hidden"><div id="catTree"></div></div>
+    <div id="paneAI" class="pane hidden" style="display:none;flex-direction:column;padding:0;">
+      <div class="chatlog" id="chatLog"></div>
+      <div class="chatin"><textarea id="chatInput" placeholder="예) 3층에 외래 진료실 6개, CT실 1개, 병실 30병상, 대기실 1개 배치해줘"></textarea><button class="tbtn primary" id="chatSend" style="align-self:stretch;">생성</button></div>
+    </div>
+  </aside>
+
+  <main>
+    <canvas id="c"></canvas>
+    <div class="titleovl"><input id="sceneTitle" placeholder="배치안 제목 입력..." maxlength="60"></div>
+    <div class="floorbar"><div class="ttl">층(FLOOR)</div><div id="floorRows"></div></div>
+    <div class="legend" id="legend"></div>
+    <div class="hint" id="hint">좌드래그: 이동 · 우드래그: 회전 · 휠: 확대 · 클릭: 선택 · <b>층 더블클릭: 단독 편집(확대)</b></div>
+    <div class="drawbar hidden" id="drawbar">✏ 그리기 모드 — 바닥을 클릭해 꼭짓점 추가 <button id="drawDone">완료</button><button id="drawCancel">취소</button></div>
+    <div class="pathbar hidden" id="pathbar">🚶 동선 —
+      <select id="pathKind"><option>환자</option><option>물류</option><option>직원</option><option>응급</option><option>면회객</option></select>
+      <span id="pathColors" style="display:flex;gap:5px;"></span>
+      굵기<input type="range" id="pathWidth" min="1" max="8" step="0.5" value="3" style="width:80px"><span id="pathWval">3</span>
+      <button id="pathDone">완료</button>
+    </div>
+  </main>
+
+  <aside class="right" id="rightPanel"></aside>
+</div>
+<div id="modalRoot"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const CATS = {
+  '외래·진료':0x4c8dff,'병동·병실':0x39d98a,'수술·시술':0xff6b8b,'검사·영상':0xb06bff,
+  '응급':0xff8a3d,'중환자실':0xff5d5d,'약제·공급':0xf5c542,'행정·사무':0x8c99a8,
+  '편의·후생':0x2ec9c0,'설비·기계':0xa9805a,'로비·공용':0xcfd8e3,
+};
+const CAT_KEYS=Object.keys(CATS);
+const FLOOR_H=3.6, SLAB_T=0.15, FOCUS_Y=6;
+
+let db=load(), project=null, activeFloorId=null, selectedId=null, focusFloorId=null;
+let hiddenCats=new Set(), drawing=false, drawPts=[];
+let pathMode=false, eraseMode=false, pathCapturing=false, curPath=null;
+let pathColor=0xff3b3b, pathWidth=3, pathKind='환자';
+let undoStack=[];
+const GHOST_GAP=2.0;   // 포커스 모드에서 겹쳐 보이는 반투명 층 간격
+/* 실행취소용 스냅샷: 구조 변경 전에 호출 */
+function pushUndo(){ if(!project)return; undoStack.push(JSON.stringify({floors:project.floors,gap:project.floorGap,spread:project.spread})); if(undoStack.length>50)undoStack.shift(); updateUndoBtn(); }
+function undo(){ if(!undoStack.length)return; const st=JSON.parse(undoStack.pop());
+  project.floors=st.floors; project.floorGap=st.gap; project.spread=st.spread;
+  if(focusFloorId && !getFloor(focusFloorId)) focusFloorId=null;
+  if(!getFloor(activeFloorId)) activeFloorId=project.floors[0]?.id; selectedId=null;
+  persist(); rebuildScene(); renderAll(); updateUndoBtn(); }
+function updateUndoBtn(){ const b=document.getElementById('btnUndo'); if(b){ b.disabled=!undoStack.length; b.style.opacity=undoStack.length?1:.45; } }
+
+function load(){ try{const d=JSON.parse(localStorage.getItem('hsp_db2'));if(d&&d.projects)return d;}catch(e){} return {projects:[],activeId:null}; }
+function persist(){ localStorage.setItem('hsp_db2',JSON.stringify(db)); }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function makeFloor(level){ return {id:uid(),name:level+'층',level,w:44,d:30,pdf:null,spaces:[],paths:[]}; }
+function newProject(name){
+  const p={id:uid(),name:name||('병원 배치안 '+(db.projects.length+1)),createdAt:Date.now(),floors:[makeFloor(1)],history:[],baseline:null};
+  db.projects.unshift(p); db.activeId=p.id; persist(); return p;
+}
+
+/* ---------- 면적 계산 ---------- */
+function spaceArea(s){ return s.shape==='poly'? polyArea(s.points) : s.w*s.d; }
+function polyArea(pts){ let a=0; for(let i=0;i<pts.length;i++){ const p=pts[i],q=pts[(i+1)%pts.length]; a+=p[0]*q[1]-q[0]*p[1]; } return Math.abs(a/2); }
+function polyCentroid(pts){ let x=0,z=0; pts.forEach(p=>{x+=p[0];z+=p[1];}); return [x/pts.length,z/pts.length]; }
+function catTotals(floors){ const m={}; floors.forEach(f=>f.spaces.forEach(s=>{ m[s.category]=(m[s.category]||0)+spaceArea(s); })); return m; }
+function totalArea(floors){ let a=0; floors.forEach(f=>f.spaces.forEach(s=>a+=spaceArea(s))); return a; }
+
+/* ---------- 3D ---------- */
+const canvas=document.getElementById('c');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0b0e13);
+const camera=new THREE.PerspectiveCamera(45,1,0.1,3000); camera.position.set(48,46,58);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true; controls.dampingFactor=0.08; controls.target.set(0,6,0);
+scene.add(new THREE.AmbientLight(0xffffff,0.78));
+const dir=new THREE.DirectionalLight(0xffffff,0.85); dir.position.set(30,60,20); scene.add(dir);
+const grid=new THREE.GridHelper(140,70,0x2a323d,0x1a2029); grid.position.y=-0.01; scene.add(grid);
+const worldRoot=new THREE.Group(); scene.add(worldRoot);
+const drawHelper=new THREE.Group(); scene.add(drawHelper);
+const spaceMeshes=new Map(), floorGroups=new Map(), pathMeshes=new Map();
+
+function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; if(canvas.width!==w||canvas.height!==h){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();} }
+let tween=null;
+function flyTo(camTo,tgtTo,dur){ tween={fc:camera.position.clone(),tc:camTo,ft:controls.target.clone(),tt:tgtTo,t0:performance.now(),dur:dur||650}; }
+function animate(){ resize();
+  if(tween){ let k=(performance.now()-tween.t0)/tween.dur; if(k>=1){k=1;} const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    camera.position.lerpVectors(tween.fc,tween.tc,e); controls.target.lerpVectors(tween.ft,tween.tt,e); if(k>=1)tween=null; }
+  controls.update(); renderer.render(scene,camera); requestAnimationFrame(animate); }
+animate();
+
+function rebuildScene(){
+  worldRoot.clear(); spaceMeshes.clear(); floorGroups.clear(); pathMeshes.clear();
+  if(!project) return;
+  const gap=(project.floorGap==null?FLOOR_H:project.floorGap);
+  if(focusFloorId){                       // 단독 편집(포커스) 모드
+    const cf=getFloor(focusFloorId);
+    if(cf){
+      // 나머지 모든 층을 반투명(ghost)으로 겹쳐 표시 → 상하층 위치 정렬 확인
+      project.floors.forEach(f=>{ if(f.id!==focusFloorId) worldRoot.add(buildFloorGroup(f,FOCUS_Y+(f.level-cf.level)*GHOST_GAP,true)); });
+      worldRoot.add(buildFloorGroup(cf,FOCUS_Y,false));
+      return;
+    }
+    focusFloorId=null;
+  }
+  const sorted=[...project.floors].sort((a,b)=>a.level-b.level);
+  sorted.forEach((f,idx)=> worldRoot.add(buildFloorGroup(f, project.spread?0:idx*gap, false)));
+}
+function buildFloorGroup(f,y,ghost){
+  const g=new THREE.Group(); g.position.set(f.ox||0, y, f.oz||0); floorGroups.set(f.id,g);
+  const slab=new THREE.Mesh(new THREE.BoxGeometry(f.w,SLAB_T,f.d),new THREE.MeshStandardMaterial({color:0x20272f,roughness:.95,transparent:true,opacity:ghost?0.05:1}));
+  slab.position.y=-SLAB_T/2; slab.userData={floorId:f.id,slab:true}; g.add(slab);
+  if(f.pdf && !ghost){ const tex=new THREE.TextureLoader().load(f.pdf);
+    const plane=new THREE.Mesh(new THREE.PlaneGeometry(f.w,f.d),new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:.85}));
+    plane.rotation.x=-Math.PI/2; plane.position.y=0.02; g.add(plane); }
+  const edge=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(f.w,SLAB_T,f.d)),
+    new THREE.LineBasicMaterial({color:ghost?0x394a5a:(f.id===activeFloorId?0x4c8dff:0x39424f),transparent:true,opacity:ghost?.5:1})); edge.position.y=-SLAB_T/2; g.add(edge);
+  f.spaces.forEach(s=>g.add(buildSpaceMesh(f,s,ghost)));
+  // 3D 명칭 라벨 — 선택해 [명칭표시]로 지정한 공간만 표시
+  if(!ghost){ f.spaces.forEach(s=>{ if(!s.showName) return;
+    const c=s.shape==='poly'?polyCentroid(s.points):[s.x,s.z];
+    const spr=makeLabelSprite(s.name); spr.position.set(c[0],(s.h||3)+1.3,c[1]); g.add(spr);
+  }); }
+  // 동선(경로) 렌더
+  if(!ghost && f.paths) f.paths.forEach(pa=>g.add(buildPathMesh(f,pa)));
+  return g;
+}
+/* 동선 튜브 */
+function buildPathMesh(f,pa){
+  const pts=pa.pts.map(p=>new THREE.Vector3(p[0],0.15,p[1]));
+  let mesh;
+  if(pts.length>=2){ const curve=new THREE.CatmullRomCurve3(pts);
+    mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,Math.max(8,pts.length*4),(pa.width||3)*0.14,7,false),
+      new THREE.MeshStandardMaterial({color:pa.color||0xff3b3b,roughness:.4,emissive:pa.color||0xff3b3b,emissiveIntensity:.25}));
+  } else { mesh=new THREE.Mesh(new THREE.SphereGeometry((pa.width||3)*0.14),new THREE.MeshStandardMaterial({color:pa.color||0xff3b3b})); mesh.position.copy(pts[0]||new THREE.Vector3()); }
+  mesh.userData={pathId:pa.id,floorId:f.id};
+  pathMeshes.set(pa.id,mesh); return mesh;
+}
+/* 캔버스 텍스트 라벨 스프라이트 */
+function makeLabelSprite(text){
+  const c=document.createElement('canvas'); c.width=256; c.height=64; const x=c.getContext('2d');
+  x.fillStyle='rgba(10,14,20,.78)'; x.strokeStyle='rgba(120,150,190,.6)'; x.lineWidth=2;
+  const r=10; x.beginPath(); x.moveTo(r,2); x.arcTo(254,2,254,62,r); x.arcTo(254,62,2,62,r); x.arcTo(2,62,2,2,r); x.arcTo(2,2,254,2,r); x.closePath(); x.fill(); x.stroke();
+  x.fillStyle='#fff'; x.font='bold 26px "Malgun Gothic",sans-serif'; x.textAlign='center'; x.textBaseline='middle';
+  let t=(text||'').slice(0,12); x.fillText(t,128,33);
+  const tex=new THREE.CanvasTexture(c); tex.anisotropy=4;
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false,depthWrite:false}));
+  spr.scale.set(9,2.25,1); spr.renderOrder=999; return spr;
+}
+function buildSpaceMesh(f,s,ghost){
+  const color=CATS[s.category]??0x888888, h=s.h||3;
+  let geo;
+  if(s.shape==='poly'){
+    const shp=new THREE.Shape();
+    s.points.forEach((p,i)=> i?shp.lineTo(p[0],-p[1]):shp.moveTo(p[0],-p[1]));
+    geo=new THREE.ExtrudeGeometry(shp,{depth:h,bevelEnabled:false}); geo.rotateX(-Math.PI/2);
+  } else geo=new THREE.BoxGeometry(s.w,h,s.d);
+  const op=ghost?0.13:(hiddenCats.has(s.category)?0.05:0.92);
+  const mesh=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color,roughness:.55,metalness:.05,transparent:true,opacity:op}));
+  if(s.shape==='poly') mesh.position.set(0,0,0); else mesh.position.set(s.x,h/2,s.z);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:0x0b0e13,transparent:true,opacity:ghost?.15:.35})));
+  mesh.userData={spaceId:s.id,floorId:f.id};
+  if(ghost) return mesh;               // 반투명 참조층은 선택/드래그 대상에서 제외
+  if(s.id===selectedId){ mesh.material.emissive=new THREE.Color(0xffffff); mesh.material.emissiveIntensity=.35; }
+  spaceMeshes.set(s.id,mesh); return mesh;
+}
+
+/* ---------- 편집 모드 관리 ---------- */
+function clearModes(){ drawing=false; drawPts=[]; pathMode=false; eraseMode=false; pathCapturing=false; curPath=null; drawHelper.clear(); controls.enabled=true;
+  document.getElementById('drawbar').classList.add('hidden');
+  document.getElementById('pathbar').classList.add('hidden');
+  document.getElementById('btnDraw').classList.remove('on');
+  document.getElementById('btnPath').classList.remove('on');
+  document.getElementById('btnErase').classList.remove('on');
+  document.getElementById('hint').classList.remove('hidden'); }
+function toggleDraw(){ const on=!drawing; clearModes(); drawing=on;
+  document.getElementById('drawbar').classList.toggle('hidden',!on);
+  document.getElementById('btnDraw').classList.toggle('on',on);
+  document.getElementById('hint').classList.toggle('hidden',on); }
+function togglePath(){ const on=!pathMode; clearModes(); pathMode=on;
+  document.getElementById('pathbar').classList.toggle('hidden',!on);
+  document.getElementById('btnPath').classList.toggle('on',on); }
+function toggleErase(){ const on=!eraseMode; clearModes(); eraseMode=on;
+  document.getElementById('btnErase').classList.toggle('on',on);
+  document.getElementById('hint').textContent=on?'🧽 지우개 모드 — 지울 동선을 클릭하세요':'좌드래그: 이동 · 우드래그: 회전 · 휠: 확대 · 클릭: 선택 · 층 더블클릭: 단독 편집';
+}
+function toggleLabels(){ const s=getSpace(selectedId);
+  if(!s){ alert('먼저 3D 화면에서 도형(공간)을 클릭해 선택한 뒤 [명칭표시]를 누르세요.'); return; }
+  s.showName=!s.showName; document.getElementById('btnLabels').classList.toggle('on',!!s.showName); persist(); rebuildScene(); }
+function syncLabelBtn(){ const s=getSpace(selectedId); const b=document.getElementById('btnLabels'); if(b) b.classList.toggle('on',!!(s&&s.showName)); }
+function updateDrawHelper(){
+  drawHelper.clear();
+  const g=floorGroups.get(activeFloorId); const y=g?g.position.y+0.05:0.05;
+  drawPts.forEach(p=>{ const m=new THREE.Mesh(new THREE.SphereGeometry(0.4,10,10),new THREE.MeshBasicMaterial({color:0xf5b642})); m.position.set(p[0],y,p[1]); drawHelper.add(m); });
+  if(drawPts.length>1){ const pts=drawPts.map(p=>new THREE.Vector3(p[0],y,p[1]));
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:0xf5b642})); drawHelper.add(line); }
+}
+function finishDraw(){
+  if(drawPts.length<3){ alert('꼭짓점을 3개 이상 찍어주세요.'); return; }
+  pushUndo();
+  const f=getFloor(activeFloorId);
+  f.spaces.push({id:uid(),name:'새 실(폴리곤)',category:CAT_KEYS[0],shape:'poly',points:drawPts.slice(),h:3,memo:''});
+  selectedId=f.spaces[f.spaces.length-1].id;
+  clearModes();
+  persist(); rebuildScene(); renderAll();
+}
+
+/* ---------- 픽킹 & 드래그 ---------- */
+const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
+let dragging=null; const dragPlane=new THREE.Plane(); let dragStart=new THREE.Vector3(), meshStart=new THREE.Vector3();
+function setPtr(e){ const r=canvas.getBoundingClientRect(); ptr.x=((e.clientX-r.left)/r.width)*2-1; ptr.y=-((e.clientY-r.top)/r.height)*2+1; }
+
+function floorPlanePoint(){ const g=floorGroups.get(activeFloorId); const pl=new THREE.Plane(new THREE.Vector3(0,1,0),-(g?g.position.y:0));
+  const p=new THREE.Vector3(); return ray.ray.intersectPlane(pl,p)?[Math.round((p.x-(g?g.position.x:0))*10)/10,Math.round((p.z-(g?g.position.z:0))*10)/10]:null; }
+canvas.addEventListener('pointerdown',e=>{
+  if(e.button!==0) return; setPtr(e); ray.setFromCamera(ptr,camera);
+  if(drawing){ const pt=floorPlanePoint(); if(pt){ drawPts.push(pt); updateDrawHelper(); } return; }
+  if(eraseMode){ const hit=ray.intersectObjects([...pathMeshes.values()],false);
+    if(hit.length){ const m=hit[0].object; const f=getFloor(m.userData.floorId); if(f){ pushUndo(); f.paths=f.paths.filter(p=>p.id!==m.userData.pathId); persist(); rebuildScene(); } } return; }
+  if(pathMode){ const pt=floorPlanePoint(); if(pt){ curPath={id:uid(),kind:pathKind,color:pathColor,width:pathWidth,pts:[pt]}; pathCapturing=true; controls.enabled=false; updatePathPreview(); } return; }
+  const hits=ray.intersectObjects([...spaceMeshes.values()],false);
+  if(hits.length){
+    const m=hits[0].object; selectSpace(m.userData.spaceId);
+    const g=floorGroups.get(m.userData.floorId);
+    dragPlane.setFromNormalAndCoplanarPoint(new THREE.Vector3(0,1,0),new THREE.Vector3(0,g.position.y,0));
+    ray.ray.intersectPlane(dragPlane,dragStart); meshStart.copy(m.position);
+    dragging={mesh:m,space:getSpace(m.userData.spaceId),floor:getFloor(m.userData.floorId)}; controls.enabled=false;
+  } else {
+    const slabHit=ray.intersectObjects(worldRoot.children.map(g=>g.children[0]),false);
+    if(!slabHit.length) selectSpace(null); else { activeFloorId=slabHit[0].object.userData.floorId; rebuildScene(); renderAll(); }
+  }
+});
+canvas.addEventListener('pointermove',e=>{
+  if(pathCapturing){ setPtr(e); ray.setFromCamera(ptr,camera); const pt=floorPlanePoint();
+    if(pt){ const last=curPath.pts[curPath.pts.length-1]; if(Math.hypot(pt[0]-last[0],pt[1]-last[1])>0.8){ curPath.pts.push(pt); updatePathPreview(); } } return; }
+  if(!dragging) return; setPtr(e); ray.setFromCamera(ptr,camera);
+  const p=new THREE.Vector3(); if(!ray.ray.intersectPlane(dragPlane,p)) return;
+  dragging.mesh.position.x=meshStart.x+(p.x-dragStart.x);
+  dragging.mesh.position.z=meshStart.z+(p.z-dragStart.z);
+});
+function updatePathPreview(){ drawHelper.clear(); if(!curPath)return; const g=floorGroups.get(activeFloorId); const oy=g?g.position.y:0, ox=g?g.position.x:0, oz=g?g.position.z:0;
+  const pts=curPath.pts.map(p=>new THREE.Vector3(p[0]+ox,oy+0.2,p[1]+oz));
+  if(pts.length>1) drawHelper.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:curPath.color}))); }
+canvas.addEventListener('dblclick',e=>{
+  if(drawing){ finishDraw(); return; }
+  setPtr(e); ray.setFromCamera(ptr,camera);
+  const sh=ray.intersectObjects([...spaceMeshes.values()],false);
+  if(sh.length){ focusFloor(sh[0].object.userData.floorId); return; }
+  const fh=ray.intersectObjects(worldRoot.children.map(g=>g.children[0]),false);
+  if(fh.length) focusFloor(fh[0].object.userData.floorId);
+});
+window.addEventListener('pointerup',()=>{
+  if(pathCapturing){ pathCapturing=false; controls.enabled=true; drawHelper.clear();
+    if(curPath && curPath.pts.length>=2){ const f=getFloor(activeFloorId); if(f){ pushUndo(); (f.paths=f.paths||[]).push(curPath); persist(); rebuildScene(); } }
+    curPath=null; return; }
+  if(!dragging) return;
+  const dx=dragging.mesh.position.x-meshStart.x, dz=dragging.mesh.position.z-meshStart.z;
+  if(Math.abs(dx)>0.01||Math.abs(dz)>0.01) pushUndo();
+  const s=dragging.space, f=dragging.floor;
+  if(s.shape==='poly'){ s.points=s.points.map(p=>[Math.round((p[0]+dx)*10)/10,Math.round((p[1]+dz)*10)/10]); }
+  else { s.x=clamp(Math.round((s.x+dx)*10)/10,-f.w/2+s.w/2,f.w/2-s.w/2); s.z=clamp(Math.round((s.z+dz)*10)/10,-f.d/2+s.d/2,f.d/2-s.d/2); }
+  dragging=null; controls.enabled=true; persist(); rebuildScene(); renderRight();
+});
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+
+/* ---------- 데이터 헬퍼 ---------- */
+function getFloor(id){ return project.floors.find(f=>f.id===id); }
+function getSpace(id){ for(const f of project.floors){ const s=f.spaces.find(x=>x.id===id); if(s) return s; } return null; }
+function spaceFloor(id){ return project.floors.find(f=>f.spaces.some(s=>s.id===id)); }
+
+/* ---------- 액션 ---------- */
+function addFloor(){ pushUndo(); focusFloorId=null; const mx=project.floors.reduce((m,f)=>Math.max(m,f.level),0); const f=makeFloor(mx+1); project.floors.push(f); activeFloorId=f.id; persist(); rebuildScene(); renderAll(); }
+function addSpace(){ const f=getFloor(activeFloorId)||project.floors[0]; if(!f){addFloor();return addSpace();} pushUndo(); activeFloorId=f.id;
+  const s={id:uid(),name:'새 공간',category:CAT_KEYS[0],shape:'box',x:0,z:0,w:6,d:5,h:3,memo:''}; f.spaces.push(s); selectedId=s.id; persist(); rebuildScene(); renderAll(); }
+function deleteSpace(){ const f=spaceFloor(selectedId); if(!f)return; pushUndo(); f.spaces=f.spaces.filter(s=>s.id!==selectedId); selectedId=null; persist(); rebuildScene(); renderAll(); }
+function deleteFloor(id){ if(project.floors.length<=1){alert('최소 1개 층은 필요합니다.');return;} if(!confirm('이 층과 포함 공간을 모두 삭제할까요?'))return;
+  pushUndo(); project.floors=project.floors.filter(f=>f.id!==id); if(activeFloorId===id)activeFloorId=project.floors[0].id; if(focusFloorId===id)focusFloorId=null; persist(); rebuildScene(); renderAll(); }
+/* 층 순서 재배치: 위에서 아래 순서(newTopToBottom)대로 level 재부여 */
+function reorderFloors(newTopToBottomIds){ pushUndo();
+  const n=newTopToBottomIds.length;
+  newTopToBottomIds.forEach((id,i)=>{ const f=getFloor(id); if(f) f.level=n-i; }); // 맨 위 = 가장 큰 level
+  persist(); rebuildScene(); renderAll(); }
+/* 층 수평 이동(펼쳐보기) */
+function nudgeFloor(id,dx,dz){ const f=getFloor(id); if(!f)return; pushUndo(); f.ox=(f.ox||0)+dx; f.oz=(f.oz||0)+dz; persist(); rebuildScene(); renderAll(); }
+function resetFloorOffset(id){ const f=getFloor(id); if(!f)return; pushUndo(); f.ox=0; f.oz=0; persist(); rebuildScene(); renderAll(); }
+function toggleSpread(){ pushUndo(); project.spread=!project.spread;
+  if(project.spread){ // 바닥에 바둑판식 자동 배치
+    const sorted=[...project.floors].sort((a,b)=>b.level-a.level);
+    const cols=Math.ceil(Math.sqrt(sorted.length));
+    const cw=Math.max(...project.floors.map(f=>f.w))+8, cd=Math.max(...project.floors.map(f=>f.d))+8;
+    sorted.forEach((f,i)=>{ const r=Math.floor(i/cols), c=i%cols; f.ox=(c-(cols-1)/2)*cw; f.oz=(r)*cd; });
+  } else { project.floors.forEach(f=>{ f.ox=0; f.oz=0; }); }
+  focusFloorId=null; persist(); rebuildScene(); renderAll();
+  flyTo(new THREE.Vector3(project.spread?0:48, project.spread?90:46, project.spread?90:58), new THREE.Vector3(0,project.spread?0:6,0)); }
+function selectSpace(id){ selectedId=id; if(id)activeFloorId=spaceFloor(id).id; rebuildScene(); renderAll(); }
+function focusFloor(id){ const f=getFloor(id); if(!f)return; focusFloorId=id; activeFloorId=id; selectedId=null;
+  rebuildScene(); renderAll();
+  const r=Math.max(f.w,f.d); flyTo(new THREE.Vector3(0,FOCUS_Y+r*0.95,r*0.85+8), new THREE.Vector3(0,FOCUS_Y,0)); }
+function exitFocus(){ focusFloorId=null; rebuildScene(); renderAll();
+  flyTo(new THREE.Vector3(48,46,58), new THREE.Vector3(0,6,0)); }
+function snapshot(){ const note=prompt('이번 작업 내용을 한 줄로 기록 (예: 3층 검사실→2층 이설, 병동 확장)'); if(note===null)return;
+  project.history.unshift({id:uid(),note:note||'작업 저장',at:Date.now(),state:JSON.stringify(project.floors)}); persist(); renderHistory(); }
+function restoreSnapshot(hid){ const h=project.history.find(x=>x.id===hid); if(!h)return;
+  if(!confirm('이 시점 상태로 되돌립니다.\n('+h.note+')'))return; project.floors=JSON.parse(h.state); activeFloorId=project.floors[0]?.id; selectedId=null; persist(); rebuildScene(); renderAll(); }
+function setBaseline(){ project.baseline={at:Date.now(),floors:JSON.parse(JSON.stringify(project.floors))};
+  persist(); alert('현재 배치를 "기준안(Before)"으로 지정했습니다.\n이후 변경분은 [면적 증감표]에서 자동 비교됩니다.'); }
+
+/* ---------- PDF ---------- */
+document.getElementById('pdfInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file)return; const f=getFloor(activeFloorId)||project.floors[0]; activeFloorId=f.id;
+  const buf=await file.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(1);
+  const vp=page.getViewport({scale:2}); const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+  await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; f.pdf=cv.toDataURL('image/png');
+  const ratio=vp.width/vp.height; f.d=30; f.w=Math.round(30*ratio*10)/10; persist(); rebuildScene(); renderAll(); e.target.value='';
+  alert('PDF 도면을 '+f.name+' 바닥에 깔았습니다.\n우측 [층 실치수]에서 실제 가로/세로(m)를 입력해 스케일을 맞춘 뒤,\n[✏ 실 외곽선 그리기]로 도면 위 실 모양을 그대로 따라 그리세요.');
+});
+
+/* ============================================================ UI ============================================================ */
+function renderAll(){ renderFloorRows(); renderLegend(); renderRight(); renderHistory(); renderCatTree(); renderChat(); syncTitle(); syncLabelBtn(); }
+let dragSrcFloor=null;
+function renderFloorRows(){ const el=document.getElementById('floorRows'); el.innerHTML='';
+  if(focusFloorId){ const f=getFloor(focusFloorId);
+    const bn=document.createElement('button'); bn.className='fsel active'; bn.style.cssText='width:100%;text-align:center;margin-bottom:6px;';
+    bn.textContent='← 전체 보기 (스택으로)'; bn.onclick=exitFocus; el.append(bn);
+    const cur=document.createElement('div'); cur.style.cssText='font-size:11px;color:#f5b642;text-align:center;'; cur.textContent='✎ '+f.name+' 단독 편집 중'; el.append(cur);
+    const gh=document.createElement('div'); gh.style.cssText='font-size:10px;color:var(--muted);text-align:center;margin-bottom:2px;'; gh.textContent='(다른 층은 반투명 겹침 = 정렬 확인용)'; el.append(gh);
+    return; }
+  // 보기 전환 + 층 간격
+  const bar=document.createElement('div'); bar.style.cssText='display:flex;gap:6px;margin-bottom:8px;';
+  const sp=document.createElement('button'); sp.className='fsel'+(project.spread?' active':''); sp.style.flex='1'; sp.textContent=project.spread?'▤ 다시 쌓기':'▦ 바닥에 펼치기'; sp.onclick=toggleSpread;
+  bar.append(sp); el.append(bar);
+  if(!project.spread){
+    const gapWrap=document.createElement('div'); gapWrap.style.cssText='margin-bottom:8px;';
+    const gv=(project.floorGap==null?FLOOR_H:project.floorGap);
+    gapWrap.innerHTML='<div style="font-size:10.5px;color:var(--muted);display:flex;justify-content:space-between;"><span>층 간격</span><span id="gapVal">'+gv.toFixed(1)+' m</span></div>';
+    const sl=document.createElement('input'); sl.type='range'; sl.min='0'; sl.max='16'; sl.step='0.2'; sl.value=gv; sl.style.width='100%';
+    let gapUndone=false;
+    sl.onpointerdown=()=>{ pushUndo(); gapUndone=false; };
+    sl.oninput=e=>{ project.floorGap=+e.target.value; document.getElementById('gapVal').textContent=(+e.target.value).toFixed(1)+' m'; rebuildScene(); };
+    sl.onchange=()=>persist();
+    gapWrap.append(sl); el.append(gapWrap);
+  }
+  const hint=document.createElement('div'); hint.style.cssText='font-size:10px;color:var(--muted);margin-bottom:5px;'; hint.textContent='↕ 목록을 드래그해 순서 변경'; el.append(hint);
+  [...project.floors].sort((a,b)=>b.level-a.level).forEach(f=>{ const row=document.createElement('div'); row.className='frow'; row.draggable=true;
+    row.ondragstart=e=>{ dragSrcFloor=f.id; e.dataTransfer.effectAllowed='move'; row.style.opacity='.4'; };
+    row.ondragend=()=>{ dragSrcFloor=null; row.style.opacity='1'; };
+    row.ondragover=e=>{ e.preventDefault(); row.style.borderTop='2px solid var(--accent)'; };
+    row.ondragleave=()=>{ row.style.borderTop=''; };
+    row.ondrop=e=>{ e.preventDefault(); row.style.borderTop=''; if(!dragSrcFloor||dragSrcFloor===f.id)return;
+      let ids=[...project.floors].sort((a,b)=>b.level-a.level).map(x=>x.id);
+      ids=ids.filter(id=>id!==dragSrcFloor); ids.splice(ids.indexOf(f.id),0,dragSrcFloor); reorderFloors(ids); };
+    const gp=document.createElement('span'); gp.textContent='⋮⋮'; gp.style.cssText='color:var(--muted);cursor:grab;font-size:11px;';
+    const b=document.createElement('button'); b.className='fsel'+(f.id===activeFloorId?' active':''); b.textContent=f.name+'  ('+f.spaces.length+'실)'+((f.ox||f.oz)?' ↔':'');
+    b.onclick=()=>{activeFloorId=f.id;rebuildScene();renderAll();};
+    const z=document.createElement('button'); z.className='x'; z.textContent='⤢'; z.title='이 층 단독 편집(확대)'; z.onclick=()=>focusFloor(f.id);
+    const x=document.createElement('button'); x.className='x'; x.textContent='✕'; x.onclick=()=>deleteFloor(f.id);
+    row.append(gp,b,z,x); el.append(row); });
+  // 활성 층 수평 이동 패드
+  const af=getFloor(activeFloorId);
+  if(af){ const pad=document.createElement('div'); pad.style.cssText='margin-top:8px;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;';
+    pad.innerHTML='<div style="font-size:10.5px;color:var(--muted);margin-bottom:5px;">'+esc(af.name)+' 수평 이동 (5m)</div>';
+    const grid=document.createElement('div'); grid.style.cssText='display:grid;grid-template-columns:repeat(3,1fr);gap:4px;';
+    const mk=(t,dx,dz,fn)=>{ const btn=document.createElement('button'); btn.textContent=t; btn.className='tbtn'; btn.style.padding='5px'; btn.onclick=fn||(()=>nudgeFloor(af.id,dx,dz)); return btn; };
+    grid.append(mk('',0,0,()=>{}),mk('▲',0,-5),mk('',0,0,()=>{}),mk('◀',-5,0),mk('⊙',0,0,()=>resetFloorOffset(af.id)),mk('▶',5,0),mk('',0,0,()=>{}),mk('▼',0,5),mk('',0,0,()=>{}));
+    [...grid.children].forEach(c=>{ if(!c.textContent){ c.style.visibility='hidden'; } });
+    pad.append(grid); el.append(pad); }
+}
+function renderLegend(){ const el=document.getElementById('legend'); el.innerHTML='<div style="color:var(--muted);margin-bottom:5px;">용도별 색상 (클릭=숨김)</div>';
+  CAT_KEYS.forEach(k=>{ const li=document.createElement('div'); li.className='li'; li.style.opacity=hiddenCats.has(k)?.4:1;
+    li.innerHTML='<span class="sw" style="background:#'+CATS[k].toString(16).padStart(6,'0')+'"></span>'+k;
+    li.onclick=()=>{ hiddenCats.has(k)?hiddenCats.delete(k):hiddenCats.add(k); rebuildScene(); renderLegend(); }; el.append(li); }); }
+function renderHistory(){ const el=document.getElementById('histList'); el.innerHTML='';
+  const ph=document.createElement('div'); ph.style.cssText='font-size:10.5px;color:var(--muted);margin:2px 4px 6px;'; ph.textContent='● 현재 안: '+project.name; el.append(ph);
+  db.projects.forEach(p=>{ if(p.id===project.id)return; const it=document.createElement('div'); it.className='hitem';
+    it.innerHTML='<div class="t">📁 '+esc(p.name)+'</div><div class="d">'+p.floors.length+'개 층 · '+fmt(p.createdAt)+'</div>';
+    it.onclick=()=>{db.activeId=p.id;boot();}; el.append(it); });
+  if(!project.history.length){ const e=document.createElement('div'); e.className='empty'; e.style.padding='8px';
+    e.textContent='배치를 바꾼 뒤 상단 [작업 저장]을 누르면 여기에 히스토리가 쌓입니다.'; el.append(e); }
+  project.history.forEach(h=>{ const it=document.createElement('div'); it.className='hitem';
+    it.innerHTML='<div class="t">🕘 '+esc(h.note)+'</div><div class="d">'+fmt(h.at)+' · 클릭하면 복원</div>';
+    it.onclick=()=>restoreSnapshot(h.id); el.append(it); }); }
+
+function renderRight(){
+  const el=document.getElementById('rightPanel'); const f=getFloor(activeFloorId), s=getSpace(selectedId); let html='';
+  if(f){ html+='<div class="sec"><h3>층 실치수 (스케일 보정)</h3><div class="row2"><div><label>가로 W(m)</label><input type="number" id="fW" value="'+f.w+'" step="0.5"></div><div><label>세로 D(m)</label><input type="number" id="fD" value="'+f.d+'" step="0.5"></div></div><label>층 이름</label><input type="text" id="fName" value="'+esc(f.name)+'">'+(f.pdf?'<div class="badge" style="margin-top:6px;">📄 PDF 도면 적용됨</div>':'')+'</div>'; }
+  if(s){
+    const isPoly=s.shape==='poly';
+    html+='<div class="sec"><h3>선택 공간 편집'+(isPoly?' · 폴리곤':'')+'</h3><label>공간명(室名)</label><input type="text" id="sName" value="'+esc(s.name)+'">'+
+      '<label>용도 분류 (색상)</label><select id="sCat">'+CAT_KEYS.map(k=>'<option '+(k===s.category?'selected':'')+'>'+k+'</option>').join('')+'</select>';
+    if(isPoly){ html+='<div class="row2"><div><label>높이 H(m)</label><input type="number" id="sH" value="'+(s.h||3)+'" step="0.1"></div><div><label>바닥면적</label><input type="text" value="'+spaceArea(s).toFixed(1)+' ㎡" disabled></div></div><div class="badge" style="margin-top:6px;">꼭짓점 '+s.points.length+'개 · 드래그로 이동</div>'; }
+    else { html+='<div class="row2"><div><label>가로 W(m)</label><input type="number" id="sW" value="'+s.w+'" step="0.5"></div><div><label>세로 D(m)</label><input type="number" id="sD" value="'+s.d+'" step="0.5"></div></div><div class="row2"><div><label>높이 H(m)</label><input type="number" id="sH" value="'+(s.h||3)+'" step="0.1"></div><div><label>바닥면적</label><input type="text" value="'+spaceArea(s).toFixed(1)+' ㎡" disabled></div></div>'; }
+    html+='<label>메모 (100자 이내)</label><textarea id="sMemo" maxlength="100" placeholder="예: 심의 검토필요 / 배관이설 / 방화구획 확인">'+esc(s.memo||'')+'</textarea><div class="memohint" id="memoCount">'+((s.memo||'').length)+' / 100</div><button class="del" id="btnDel">🗑 이 공간 삭제</button></div>';
+  } else html+='<div class="sec"><div class="empty">공간을 클릭하면 편집할 수 있습니다.<br><br>· <b>＋공간(사각)</b>: 사각 블록 추가<br>· <b>✏ 실 외곽선 그리기</b>: 도면 위 비정형 실을 클릭으로 따라 그려 3D화<br>· 좌드래그로 이동</div></div>';
+  if(f){ const used=f.spaces.reduce((a,x)=>a+spaceArea(x),0), gross=f.w*f.d;
+    html+='<div class="sec"><h3>'+esc(f.name)+' 면적 요약</h3><div class="stat"><span>연면적(층)</span><b>'+gross.toFixed(1)+' ㎡</b></div><div class="stat"><span>실 배정 면적</span><b>'+used.toFixed(1)+' ㎡</b></div><div class="stat"><span>공용·복도 여유</span><b>'+(gross-used).toFixed(1)+' ㎡ ('+(gross?100*(gross-used)/gross:0).toFixed(0)+'%)</b></div></div>'; }
+  html+='<div class="sec"><h3>법령 · 심의 체크</h3>'+renderChecks(f,s)+'</div>';
+  html+=lawSectionHTML();
+  el.innerHTML=html; bindRight(f,s);
+}
+/* ---------- 관련 법령 링크 (국가법령정보센터) ---------- */
+const LAWS=[
+  ['의료법','https://www.law.go.kr/법령/의료법'],
+  ['의료법 시행규칙 (별표4 의료기관 시설규격)','https://www.law.go.kr/법령/의료법시행규칙'],
+  ['건축법','https://www.law.go.kr/법령/건축법'],
+  ['건축물의 피난·방화구조 등의 기준에 관한 규칙','https://www.law.go.kr/법령/건축물의피난·방화구조등의기준에관한규칙'],
+  ['건축물의 설비기준 등에 관한 규칙','https://www.law.go.kr/법령/건축물의설비기준등에관한규칙'],
+  ['소방시설 설치 및 관리에 관한 법률','https://www.law.go.kr/법령/소방시설설치및관리에관한법률'],
+  ['화재의 예방 및 안전관리에 관한 법률','https://www.law.go.kr/법령/화재의예방및안전관리에관한법률'],
+  ['응급의료에 관한 법률','https://www.law.go.kr/법령/응급의료에관한법률'],
+  ['장애인·노인·임산부 등의 편의증진 보장에 관한 법률','https://www.law.go.kr/법령/장애인·노인·임산부등의편의증진보장에관한법률'],
+];
+function lawSectionHTML(){ return '<div class="sec"><h3>관련 법령 바로가기 🔗</h3>'+
+  LAWS.map(l=>'<a class="lawlink" href="'+encodeURI(l[1])+'" target="_blank" rel="noopener">🔗 '+l[0]+'</a>').join('')+
+  '<div class="badge" style="margin-top:6px;">클릭 시 국가법령정보센터(law.go.kr)로 연결</div></div>'; }
+function renderChecks(f,s){ const items=[];
+  if(s && s.category==='병동·병실'){ const area=spaceArea(s), cap=Math.floor(area/6.3);
+    items.push(chk(area>=6.3,'입원실 바닥면적','현재 '+area.toFixed(1)+'㎡ → 2인이상 1인당 6.3㎡ 적용 시 최대 '+cap+'병상. (1인실 10㎡ 이상) *의료법 시행규칙 별표4')); }
+  if(f){ const used=f.spaces.reduce((a,x)=>a+spaceArea(x),0), gross=f.w*f.d, r=gross?(gross-used)/gross:0;
+    items.push(chk(r>=0.30,'공용·복도 확보율',(100*r).toFixed(0)+'% 확보. 병원 복도 유효폭 1.5m(양옆 거실 2.1m) 이상 및 피난동선 확보. *건축물방화구조규칙')); }
+  if(s && (s.category==='수술·시술'||s.category==='중환자실')) items.push(chk(true,'특수구역 설비','수술실·중환자실은 별도 공조(양압/음압)·의료가스·비상전원(자가발전) 계통 검토. 이설 시 전기·기계 인프라 동반 확인.'));
+  if(s && s.category==='응급') items.push(chk(true,'응급실 접근·피난','구급차 진입동선·별도 출입구·이송동선 확보. *응급의료법 시설기준'));
+  items.push(chk(true,'병상 증설 시 심의','병상 신·증설은 시·도 사전심의→본심의(복지부 병상수급 기본시책) 대상일 수 있음. 총 병상수 변동 시 절차 확인.'));
+  return items.join(''); }
+function chk(p,h,n){ return '<div class="chk '+(p?'pass':'warn')+'"><div class="h">'+(p?'✔ ':'⚠ ')+h+'</div><div class="n">'+n+'</div></div>'; }
+function bindRight(f,s){ const on=(id,ev,fn)=>{const e=document.getElementById(id);if(e)e.addEventListener(ev,fn);};
+  if(f){ on('fW','change',e=>{f.w=+e.target.value||f.w;persist();rebuildScene();renderRight();});
+    on('fD','change',e=>{f.d=+e.target.value||f.d;persist();rebuildScene();renderRight();});
+    on('fName','change',e=>{f.name=e.target.value;persist();renderFloorRows();}); }
+  if(s){ on('sName','input',e=>{s.name=e.target.value;persist();});
+    on('sCat','change',e=>{s.category=e.target.value;persist();rebuildScene();renderRight();});
+    ['sW','sD','sH'].forEach(id=>on(id,'change',e=>{const v=+e.target.value;if(id==='sW')s.w=v;if(id==='sD')s.d=v;if(id==='sH')s.h=v;persist();rebuildScene();renderRight();}));
+    on('sMemo','input',e=>{s.memo=e.target.value.slice(0,100);document.getElementById('memoCount').textContent=s.memo.length+' / 100';persist();});
+    on('btnDel','click',deleteSpace); } }
+
+/* ============================================================ 모달: 증감표 / 비교 / 보고서 ============================================================ */
+function openModal(html){ document.getElementById('modalRoot').innerHTML='<div class="overlay" id="ov"><div class="modal">'+html+'</div></div>';
+  document.getElementById('ov').addEventListener('click',e=>{ if(e.target.id==='ov') closeModal(); }); }
+function closeModal(){ document.getElementById('modalRoot').innerHTML=''; }
+window.closeModal=closeModal;
+
+function deltaTableHTML(before,after,title){
+  const b=catTotals(before), a=catTotals(after); const keys=[...new Set([...Object.keys(b),...Object.keys(a)])].sort((x,y)=>CAT_KEYS.indexOf(x)-CAT_KEYS.indexOf(y));
+  let rows=keys.map(k=>{ const bv=b[k]||0, av=a[k]||0, d=av-bv;
+    return '<tr><td><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:#'+(CATS[k]||0x888888).toString(16).padStart(6,'0')+';margin-right:6px;"></span>'+k+'</td><td>'+bv.toFixed(1)+'</td><td>'+av.toFixed(1)+'</td><td class="'+(d>0.05?'up':d<-0.05?'down':'')+'">'+(d>0?'+':'')+d.toFixed(1)+'</td></tr>';
+  }).join('');
+  const tb=totalArea(before), ta=totalArea(after), td=ta-tb;
+  return '<table class="at"><thead><tr><th>'+(title||'용도')+'</th><th>기준안 Before(㎡)</th><th>현재안 After(㎡)</th><th>증감 Δ(㎡)</th></tr></thead><tbody>'+rows+
+    '</tbody><tfoot><tr><td>총 실면적</td><td>'+tb.toFixed(1)+'</td><td>'+ta.toFixed(1)+'</td><td class="'+(td>0.05?'up':td<-0.05?'down':'')+'">'+(td>0?'+':'')+td.toFixed(1)+'</td></tr></tfoot></table>';
+}
+function showDelta(){
+  if(!project.baseline){ if(confirm('기준안이 아직 없습니다. 지금 현재 배치를 기준안으로 지정할까요?')) setBaseline(); else return; }
+  const html='<button class="close" onclick="closeModal()">닫기</button><h2>📊 면적 증감표 (기준안 대비)</h2>'+
+    '<div class="sub">기준안 지정: '+fmt(project.baseline.at)+' → 현재 배치와 용도별 면적을 자동 비교합니다.</div>'+
+    deltaTableHTML(project.baseline.floors, project.floors)+
+    '<div class="sub" style="margin-top:12px;">※ 폴리곤 실은 실제 다각형 면적(신발끈 공식)으로, 사각 실은 W×D로 산출됩니다.</div>';
+  openModal(html);
+}
+function showCompare(){
+  const opts=db.projects.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('');
+  openModal('<button class="close" onclick="closeModal()">닫기</button><h2>🆚 안(案) 비교</h2><div class="sub">두 배치안의 용도별 면적을 나란히 비교합니다.</div>'+
+    '<div class="pick">A안 <select id="cmpA">'+opts+'</select> B안 <select id="cmpB">'+opts+'</select></div><div id="cmpOut"></div>');
+  const A=document.getElementById('cmpA'), B=document.getElementById('cmpB');
+  A.value=project.id; B.value=(db.projects.find(p=>p.id!==project.id)||project).id;
+  const draw=()=>{ const pa=db.projects.find(p=>p.id===A.value), pb=db.projects.find(p=>p.id===B.value);
+    document.getElementById('cmpOut').innerHTML='<h3 style="font-size:12px;color:var(--muted);">A='+esc(pa.name)+'  →  B='+esc(pb.name)+'</h3>'+deltaTableHTML(pa.floors,pb.floors); };
+  A.onchange=draw; B.onchange=draw; draw();
+}
+function capture(){ renderer.render(scene,camera); const url=renderer.domElement.toDataURL('image/png');
+  const a=document.createElement('a'); a.href=url; a.download=project.name+'_3D.png'; a.click(); }
+
+function showReport(){
+  const w=window.open('','_blank'); if(!w){alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도하세요.');return;}
+  renderer.render(scene,camera); const img=renderer.domElement.toDataURL('image/png');
+  const floorsHTML=[...project.floors].sort((a,b)=>b.level-a.level).map(f=>{
+    const used=f.spaces.reduce((a,x)=>a+spaceArea(x),0), gross=f.w*f.d;
+    const rows=f.spaces.map(s=>'<tr><td>'+esc(s.name)+'</td><td>'+s.category+(s.shape==='poly'?' (폴리곤)':'')+'</td><td style="text-align:right">'+spaceArea(s).toFixed(1)+'</td><td>'+esc(s.memo||'')+'</td></tr>').join('')||'<tr><td colspan="4" style="color:#999">공간 없음</td></tr>';
+    return '<h3>'+esc(f.name)+' <span style="font-weight:400;color:#666;font-size:13px">연면적 '+gross.toFixed(1)+'㎡ / 실배정 '+used.toFixed(1)+'㎡ / 공용여유 '+(gross-used).toFixed(1)+'㎡</span></h3>'+
+      '<table><thead><tr><th>공간명</th><th>용도</th><th style="text-align:right">면적(㎡)</th><th>메모</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }).join('');
+  const delta=project.baseline?'<h2>4. 면적 증감표 (기준안 대비)</h2>'+deltaTableHTML(project.baseline.floors,project.floors).replace(/class="at"/,'class="rt"'):'';
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>'+esc(project.name)+' 공간기획 보고서</title>'+
+    '<style>body{font-family:"Malgun Gothic",sans-serif;color:#111;max-width:900px;margin:24px auto;padding:0 20px;}h1{border-bottom:3px solid #4c8dff;padding-bottom:8px;}h2{margin-top:26px;color:#1a3a6b;}h3{margin-top:18px;}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0 14px;}th,td{border:1px solid #ccc;padding:6px 8px;}th{background:#eef3fb;}img{width:100%;border:1px solid #ccc;border-radius:8px;}.rt td:nth-child(n+2),.rt th:nth-child(n+2){text-align:right;}.meta{color:#666;font-size:13px;}@media print{.noprint{display:none;}}</style></head><body>'+
+    '<button class="noprint" onclick="window.print()" style="float:right;padding:8px 16px;">🖨 인쇄 / PDF 저장</button>'+
+    '<h1>🏥 '+esc(project.name)+' — 공간기획·재배치 보고서</h1>'+
+    '<p class="meta">작성일: '+fmt(Date.now())+' · 총 '+project.floors.length+'개 층 · 총 실면적 '+totalArea(project.floors).toFixed(1)+'㎡'+(project.baseline?' · 기준안 지정: '+fmt(project.baseline.at):'')+'</p>'+
+    '<h2>1. 3D 배치 전경</h2><img src="'+img+'">'+
+    '<h2>2. 층별 공간 구성 및 메모</h2>'+floorsHTML+
+    '<h2>3. 법령·심의 검토 참고</h2><ul style="font-size:13px;line-height:1.8"><li>입원실 1인당 바닥면적 6.3㎡ 이상(1인실 10㎡) — 의료법 시행규칙 별표4</li><li>병원 복도 유효폭 1.5m 이상(양옆 거실 2.1m) 및 피난동선 확보 — 건축물방화구조규칙</li><li>수술실·중환자실 공조(양압/음압)·의료가스·비상전원 계통 검토</li><li>병상 신·증설 시 시·도 사전심의→본심의(복지부 병상수급 기본시책) 절차 확인</li></ul>'+
+    delta+'<p class="meta" style="margin-top:30px">본 보고서는 기획 검토용 개략자료이며, 인허가·심의 제출 전 실제 도면·설비도서와의 대조 검증이 필요합니다.</p></body></html>');
+  w.document.close();
+}
+
+/* ---------- 유틸 ---------- */
+function esc(t){ return (t||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function fmt(ts){ const d=new Date(ts); return d.getFullYear()+'.'+(d.getMonth()+1)+'.'+d.getDate()+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+
+/* ---------- 버튼 ---------- */
+document.getElementById('btnAddFloor').onclick=addFloor;
+document.getElementById('btnAddSpace').onclick=addSpace;
+document.getElementById('btnDraw').onclick=toggleDraw;
+document.getElementById('drawDone').onclick=finishDraw;
+document.getElementById('drawCancel').onclick=clearModes;
+document.getElementById('btnPath').onclick=togglePath;
+document.getElementById('btnErase').onclick=toggleErase;
+document.getElementById('btnLabels').onclick=toggleLabels;
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+document.getElementById('chatSend').onclick=sendChat;
+document.getElementById('chatInput').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendChat(); } });
+document.getElementById('sceneTitle').addEventListener('input',e=>{ project.title=e.target.value.slice(0,60); persist(); });
+document.getElementById('btnBaseline').onclick=setBaseline;
+document.getElementById('btnDelta').onclick=showDelta;
+document.getElementById('btnCompare').onclick=showCompare;
+document.getElementById('btnReport').onclick=showReport;
+document.getElementById('btnCapture').onclick=capture;
+document.getElementById('btnUndo').onclick=undo;
+document.getElementById('btnSnapshot').onclick=snapshot;
+document.getElementById('btnNewProj').onclick=()=>{const n=prompt('새 배치안 이름');if(n!==null){newProject(n);boot();}};
+document.getElementById('btnExport').onclick=()=>{const blob=new Blob([JSON.stringify(project,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=project.name+'.json';a.click();};
+document.getElementById('importInput').onchange=async e=>{const file=e.target.files[0];if(!file)return;try{const p=JSON.parse(await file.text());p.id=uid();db.projects.unshift(p);db.activeId=p.id;persist();boot();}catch(err){alert('불러오기 실패: 올바른 JSON이 아닙니다.');}};
+window.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ closeModal(); if(drawing) document.getElementById('drawCancel').click(); }
+  if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); }
+});
+
+/* ============================================================ CAD(DXF) · 자동인식 · 분류 · 동선 · AI배치 ============================================================ */
+/* 실명 키워드 → 카테고리 + 기본치수 + 기본실명 */
+const KW=[
+  [/외래|진료실|외래진료|clinic/i,'외래·진료',6,5,'외래진료실'],
+  [/수술|시술|\bop\b|operation/i,'수술·시술',8,7,'수술실'],
+  [/분만|산부/,'수술·시술',8,7,'분만실'],
+  [/중환자|icu|nicu|sicu|micu|ccu/i,'중환자실',9,8,'중환자실'],
+  [/ct|mri|\bmr\b|영상|촬영|방사선|엑스레이|x-?ray|초음파|angio/i,'검사·영상',8,7,'영상검사실'],
+  [/검사|채혈|진단검사|병리|내시경/,'검사·영상',7,6,'검사실'],
+  [/응급|\ber\b|외상|trauma/i,'응급',10,8,'응급실'],
+  [/약국|약제|조제|pharm/i,'약제·공급',7,6,'약제실'],
+  [/병실|입원|병상|병동|ward|room/i,'병동·병실',7,5,'병실'],
+  [/사무|행정|원무|회의|상담|의국|당직|office/i,'행정·사무',8,6,'사무실'],
+  [/탈의|휴게|편의|카페|식당|매점|샤워|라운지|수유|lounge/i,'편의·후생',7,6,'편의공간'],
+  [/기계|전기|설비|공조|전산|서버|배관|ahu|elec|mech/i,'설비·기계',8,6,'설비실'],
+  [/로비|대기|접수|홀|안내|공용|복도|lobby|hall|waiting/i,'로비·공용',10,8,'대기공간'],
+];
+function categorizeName(name){ const n=(name||'').toString(); for(const r of KW){ if(r[0].test(n)) return r[1]; } return '로비·공용'; }
+
+/* ---------- DXF ---------- */
+document.getElementById('cadInput').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file)return; e.target.value='';
+  if(/\.dwg$/i.test(file.name)){ alert('⚠ DWG는 브라우저에서 직접 열 수 없습니다.\n\nAutoCAD에서 [다른 이름으로 저장 → DXF(*.dxf)] 또는 PDF로 변환 후 업로드해 주세요.\n(DXF로 올리면 실 명칭·면적이 자동 인식됩니다.)'); return; }
+  let text; try{ text=await file.text(); }catch(err){ alert('파일을 읽지 못했습니다.'); return; }
+  let ents; try{ ents=parseDXF(text); }catch(err){ alert('DXF 파싱 실패: '+err.message); return; }
+  applyDXF(ents);
+});
+function parseDXF(text){
+  const L=text.split(/\r\n|\r|\n/); const P=[];
+  for(let i=0;i+1<L.length;i+=2){ const c=L[i].trim(); if(c==='')continue; P.push([parseInt(c,10),L[i+1]]); }
+  const ents=[]; let cur=null; const flush=()=>{ if(cur)ents.push(cur); cur=null; };
+  for(const [code,valRaw] of P){ const val=(valRaw==null?'':valRaw).trim();
+    if(code===0){ flush(); cur={type:val,pts:[],text:''}; continue; }
+    if(!cur)continue; const num=parseFloat(val);
+    switch(code){
+      case 10: cur.pts.push([num,0]); break;
+      case 20: if(cur.pts.length) cur.pts[cur.pts.length-1][1]=num; break;
+      case 11: cur.p2=[num,0]; break;
+      case 21: if(cur.p2) cur.p2[1]=num; break;
+      case 40: if(cur.r==null) cur.r=num; break;
+      case 70: cur.flag=parseInt(val,10)||0; break;
+      case 1: cur.text=val; break;
+      case 8: cur.layer=val; break;
+    }
+  }
+  flush(); return ents;
+}
+function stitch(ents){ const out=[]; let poly=null;
+  for(const en of ents){
+    if(en.type==='POLYLINE'){ poly={type:'LWPOLYLINE',pts:[],flag:en.flag||0,layer:en.layer}; out.push(poly); continue; }
+    if(en.type==='VERTEX'){ if(poly&&en.pts[0]) poly.pts.push(en.pts[0]); continue; }
+    if(en.type==='SEQEND'){ poly=null; continue; }
+    poly=null; out.push(en);
+  } return out;
+}
+function bboxOf(ents){ let a=1e18,b=1e18,c=-1e18,d=-1e18; const u=(x,y)=>{ if(!isFinite(x)||!isFinite(y))return; a=Math.min(a,x);b=Math.min(b,y);c=Math.max(c,x);d=Math.max(d,y); };
+  ents.forEach(en=>{ en.pts.forEach(p=>u(p[0],p[1])); if(en.p2)u(en.p2[0],en.p2[1]); if(en.type==='CIRCLE'&&en.r&&en.pts[0]){u(en.pts[0][0]-en.r,en.pts[0][1]-en.r);u(en.pts[0][0]+en.r,en.pts[0][1]+en.r);} });
+  return {minx:a,miny:b,maxx:c,maxy:d}; }
+function renderDXF(ents,bb){ const W=1600,H=Math.max(200,Math.round(1600*(bb.maxy-bb.miny)/((bb.maxx-bb.minx)||1)));
+  const cv=document.createElement('canvas'); cv.width=W; cv.height=H; const x=cv.getContext('2d');
+  x.fillStyle='#fff'; x.fillRect(0,0,W,H);
+  const sx=W/((bb.maxx-bb.minx)||1), sy=H/((bb.maxy-bb.miny)||1), TX=X=>(X-bb.minx)*sx, TY=Y=>H-(Y-bb.miny)*sy;
+  x.strokeStyle='#333'; x.lineWidth=1; x.fillStyle='#222'; x.font='12px sans-serif';
+  ents.forEach(en=>{
+    if(en.type==='LINE'&&en.pts[0]&&en.p2){ x.beginPath(); x.moveTo(TX(en.pts[0][0]),TY(en.pts[0][1])); x.lineTo(TX(en.p2[0]),TY(en.p2[1])); x.stroke(); }
+    else if(en.type==='LWPOLYLINE'&&en.pts.length>1){ x.beginPath(); en.pts.forEach((p,i)=> i?x.lineTo(TX(p[0]),TY(p[1])):x.moveTo(TX(p[0]),TY(p[1]))); if(en.flag&1)x.closePath(); x.stroke(); }
+    else if(en.type==='CIRCLE'&&en.r&&en.pts[0]){ x.beginPath(); x.arc(TX(en.pts[0][0]),TY(en.pts[0][1]),en.r*sx,0,7); x.stroke(); }
+    else if((en.type==='TEXT'||en.type==='MTEXT')&&en.text&&en.pts[0]){ x.fillText(en.text.replace(/\\[A-Za-z0-9.|{}]+;?/g,'').slice(0,20),TX(en.pts[0][0]),TY(en.pts[0][1])); }
+  });
+  return cv.toDataURL('image/png');
+}
+function pointInPoly(px,pz,poly){ let c=false; for(let i=0,j=poly.length-1;i<poly.length;j=i++){ const xi=poly[i][0],zi=poly[i][1],xj=poly[j][0],zj=poly[j][1];
+  if(((zi>pz)!=(zj>pz)) && (px<(xj-xi)*(pz-zi)/((zj-zi)||1e-9)+xi)) c=!c; } return c; }
+function recognizeSpaces(ents,cx,cy,scale,f){
+  const rooms=ents.filter(en=>en.type==='LWPOLYLINE'&&(en.flag&1)&&en.pts.length>=3);
+  const texts=ents.filter(en=>(en.type==='TEXT'||en.type==='MTEXT')&&en.text&&en.pts[0])
+    .map(t=>({x:t.pts[0][0],y:t.pts[0][1],s:t.text.replace(/\\[A-Za-z0-9.|{}]+;?/g,'').trim()})).filter(t=>t.s);
+  const floorArea=f.w*f.d; let count=0;
+  rooms.forEach(rm=>{
+    const pts=rm.pts.map(p=>[(p[0]-cx)*scale,-((p[1]-cy)*scale)]);
+    const area=polyArea(pts); if(area<3||area>floorArea*0.9) return;
+    let name='';
+    for(const t of texts){ const lx=(t.x-cx)*scale, lz=-((t.y-cy)*scale); if(pointInPoly(lx,lz,pts)){ name=t.s; break; } }
+    if(!name){ const c=polyCentroid(pts); let best=1e9; for(const t of texts){ const lx=(t.x-cx)*scale, lz=-((t.y-cy)*scale); const dd=Math.hypot(lx-c[0],lz-c[1]); if(dd<best){best=dd;name=t.s;} } if(best>Math.sqrt(area)) name=''; }
+    if(!name) name='실'+(count+1);
+    f.spaces.push({id:uid(),name,category:categorizeName(name),shape:'poly',points:pts,h:3,memo:'',auto:true}); count++;
+  });
+  return count;
+}
+function applyDXF(rawEnts){
+  const ents=stitch(rawEnts); const bb=bboxOf(ents); const wD=bb.maxx-bb.minx, hD=bb.maxy-bb.miny;
+  if(!(wD>0&&hD>0)){ alert('도면 좌표를 찾지 못했습니다. (LINE/POLYLINE 엔티티가 있는 DXF인지 확인)'); return; }
+  const maxDim=Math.max(wD,hD); const guess=maxDim>1000?'mm':(maxDim>150?'cm':'m');
+  let unit=prompt('도면 단위를 확인하세요 (mm / cm / m)\n도면 최대 치수 ≈ '+Math.round(maxDim)+' 도면단위',guess);
+  if(unit===null) return; unit=unit.trim().toLowerCase(); const scale=unit==='mm'?0.001:unit==='cm'?0.01:1;
+  const cx=(bb.minx+bb.maxx)/2, cy=(bb.miny+bb.maxy)/2;
+  const f=getFloor(activeFloorId)||project.floors[0]; activeFloorId=f.id; pushUndo();
+  f.w=Math.round(wD*scale*10)/10; f.d=Math.round(hD*scale*10)/10; f.pdf=renderDXF(ents,bb);
+  const found=recognizeSpaces(ents,cx,cy,scale,f);
+  persist(); rebuildScene(); renderAll();
+  addMsg('sys','📐 DXF 도면을 '+f.name+'에 적용했습니다.\n· 도면 크기: '+f.w+'m × '+f.d+'m (단위 '+unit+')\n· 자동 인식된 구획 실: '+found+'개\n좌측 [🗂 공간분류] 탭에서 카테고리별로 확인하세요.');
+  alert('✅ DXF 적용 완료\n크기 '+f.w+'×'+f.d+'m · 자동 인식 실 '+found+'개\n\n좌측 [🗂 공간분류] 탭에서 카테고리별로 확인/클릭할 수 있습니다.'+(found===0?'\n\n(인식 0개: 닫힌 폴리라인으로 그려진 실 경계가 없거나 단위가 다를 수 있습니다.)':''));
+}
+
+/* ---------- 공간분류(카테고리) 트리 ---------- */
+function renderCatTree(){ const el=document.getElementById('catTree'); if(!el)return; el.innerHTML='';
+  const byCat={}; project.floors.forEach(f=>f.spaces.forEach(s=>{ (byCat[s.category]=byCat[s.category]||[]).push({s,f}); }));
+  const total=Object.values(byCat).reduce((a,v)=>a+v.length,0);
+  if(!total){ el.innerHTML='<div class="empty" style="padding:8px">아직 구획된 공간이 없습니다.<br><br>· DXF 도면을 올리면 실이 자동 인식·분류됩니다.<br>· 또는 공간을 추가하면 여기 카테고리별로 정리됩니다.</div>'; return; }
+  const head=document.createElement('div'); head.style.cssText='font-size:11px;color:var(--muted);margin:2px 4px 8px;'; head.textContent='총 '+total+'실 · '+Object.keys(byCat).length+'개 카테고리'; el.append(head);
+  CAT_KEYS.forEach(cat=>{ const list=byCat[cat]; if(!list||!list.length)return;
+    const grp=document.createElement('div'); grp.className='catgrp';
+    const ch=document.createElement('div'); ch.className='ch'; ch.style.opacity=hiddenCats.has(cat)?.45:1;
+    const totA=list.reduce((a,o)=>a+spaceArea(o.s),0);
+    ch.innerHTML='<span class="sw" style="background:#'+CATS[cat].toString(16).padStart(6,'0')+'"></span>'+cat+'<span class="cnt">'+list.length+'실·'+totA.toFixed(0)+'㎡</span>';
+    ch.onclick=()=>{ hiddenCats.has(cat)?hiddenCats.delete(cat):hiddenCats.add(cat); rebuildScene(); renderLegend(); renderCatTree(); };
+    grp.append(ch);
+    list.forEach(o=>{ const it=document.createElement('div'); it.className='sitem'+(o.s.id===selectedId?' sel':'');
+      it.innerHTML='<span>'+esc(o.s.name)+'</span><span style="color:var(--muted)">'+esc(o.f.name)+'·'+spaceArea(o.s).toFixed(0)+'㎡</span>';
+      it.onclick=()=>{ activeFloorId=o.f.id; selectSpace(o.s.id); }; grp.append(it); });
+    el.append(grp);
+  });
+}
+
+/* ---------- 좌측 탭 ---------- */
+function switchTab(t){ ['hist','cat','ai'].forEach(k=>{ const p=document.getElementById('pane'+cap(k)); if(p) p.style.display=(k===t)?(k==='ai'?'flex':'block'):'none';
+  const b=document.getElementById('tab'+cap(k)); if(b) b.classList.toggle('active',k===t); }); }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+/* ---------- 채팅 · AI 자동배치(규칙기반) ---------- */
+function addMsg(role,text){ project.chat=project.chat||[]; project.chat.push({role,text,at:Date.now()}); persist(); renderChat(); }
+function renderChat(){ const el=document.getElementById('chatLog'); if(!el)return; el.innerHTML='';
+  const c=project.chat||[];
+  if(!c.length){ el.innerHTML='<div class="msg sys">요구사항을 입력하면 배치안을 자동 생성합니다.\n예) "3층에 외래 진료실 6개, CT실 1개, 병실 30병상, 대기실 1개 배치"\n\n※ 오프라인 규칙기반 생성기입니다. 실 종류·개수·병상수를 인식해 새 층에 자동 배치합니다.</div>'; return; }
+  c.forEach(m=>{ const d=document.createElement('div'); d.className='msg '+(m.role==='user'?'user':'sys'); d.textContent=m.text; el.append(d); });
+  el.scrollTop=el.scrollHeight;
+}
+function sendChat(){ const inp=document.getElementById('chatInput'); const t=inp.value.trim(); if(!t)return; inp.value=''; addMsg('user',t); generateLayout(t); }
+function generateLayout(text){
+  let level=null; const lm=text.match(/(지하\s*)?(\d+)\s*층/); if(lm) level=(lm[1]?-1:1)*parseInt(lm[2],10);
+  const body=text.replace(/(지하\s*)?\d+\s*층(에다가|에다|에게|에서|에|의)?/g,' ');   // 층 토큰 제거(개수 오인식 방지)
+  const clauses=body.split(/[,\n·]|그리고|및|와 |과 /); const rooms=[];
+  clauses.forEach(cl=>{ const rule=KW.find(r=>r[0].test(cl)); if(!rule)return;
+    const num=cl.match(/(\d+)\s*(개|실|개소|병상|床|명|bed)?/i); let cnt=1, beds=0;
+    if(num){ const n=parseInt(num[1],10); if(/병상|床|bed/i.test(num[2]||'')||/병상/.test(cl)) beds=n; else cnt=n; }
+    if(rule[1]==='병동·병실'&&beds){ const per=6, nRoom=Math.max(1,Math.ceil(beds/per));
+      for(let i=0;i<nRoom;i++) rooms.push({name:rule[4]+(i+1)+'('+Math.min(per,beds-i*per)+'인)',cat:rule[1],w:7,d:6}); }
+    else for(let i=0;i<cnt;i++) rooms.push({name:rule[4]+(cnt>1?(i+1):''),cat:rule[1],w:rule[2],d:rule[3]});
+  });
+  if(!rooms.length){ addMsg('sys','인식된 실이 없습니다. 예: "외래 진료실 5개, CT 1개, 병실 20병상"처럼 실 종류와 개수를 적어주세요.'); return; }
+  pushUndo(); let f;
+  if(level!=null){ f=project.floors.find(x=>x.level===level); if(!f){ f=makeFloor(level); f.name=Math.abs(level)+'층'+(level<0?'(지하)':''); project.floors.push(f); } }
+  else { const mx=project.floors.reduce((m,x)=>Math.max(m,x.level),0); f=makeFloor(mx+1); project.floors.push(f); }
+  if(f.spaces.length){ const mx=project.floors.reduce((m,x)=>Math.max(m,x.level),0); const nf=makeFloor(mx+1); nf.name='AI배치안'; project.floors.push(nf); f=nf; }
+  activeFloorId=f.id; focusFloorId=null; packRooms(f,rooms);
+  persist(); rebuildScene(); renderAll();
+  const byCat={}; rooms.forEach(r=>byCat[r.cat]=(byCat[r.cat]||0)+1);
+  const summary=Object.entries(byCat).map(([k,v])=>k+' '+v+'실').join(', ');
+  addMsg('sys','✅ '+f.name+'에 '+rooms.length+'개 실을 자동 배치했습니다.\n· '+summary+'\n· 총 실면적 '+rooms.reduce((a,r)=>a+r.w*r.d,0).toFixed(0)+'㎡ (복도·공용 제외)\n필요 시 드래그로 위치를 조정하고 [🚶동선]으로 환자·물류 흐름을 추가하세요.');
+  project.history.unshift({id:uid(),note:'AI 자동배치: '+summary,at:Date.now(),state:JSON.stringify(project.floors)}); persist();
+  flyTo(new THREE.Vector3(0,62,64),new THREE.Vector3(0,6,0));
+}
+function packRooms(f,rooms){ const margin=2; f.w=Math.max(f.w,44);
+  let x=-f.w/2+margin, z=margin, rowH=0;
+  rooms.forEach(r=>{ if(x+r.w>f.w/2-margin){ x=-f.w/2+margin; z+=rowH+margin; rowH=0; } x+=r.w+margin; rowH=Math.max(rowH,r.d); });
+  f.d=Math.max(30,Math.round(z+rowH+margin));
+  x=-f.w/2+margin; z=-f.d/2+margin; rowH=0;
+  rooms.forEach(r=>{ if(x+r.w>f.w/2-margin){ x=-f.w/2+margin; z+=rowH+margin; rowH=0; }
+    f.spaces.push({id:uid(),name:r.name,category:r.cat,shape:'box',x:Math.round((x+r.w/2)*10)/10,z:Math.round((z+r.d/2)*10)/10,w:r.w,d:r.d,h:3,memo:'',auto:true});
+    x+=r.w+margin; rowH=Math.max(rowH,r.d); });
+}
+
+/* ---------- 동선 툴바 · 제목 ---------- */
+const PATH_COLORS=[0xff3b3b,0x3b7bff,0x39d98a,0xf5b642,0xb06bff,0xffffff];
+function initPathBar(){ const el=document.getElementById('pathColors'); el.innerHTML='';
+  PATH_COLORS.forEach(c=>{ const sw=document.createElement('span'); sw.className='sw'+(c===pathColor?' sel':''); sw.style.background='#'+c.toString(16).padStart(6,'0');
+    sw.onclick=()=>{ pathColor=c; [...el.children].forEach(ch=>ch.classList.remove('sel')); sw.classList.add('sel'); }; el.append(sw); });
+  document.getElementById('pathKind').onchange=e=>pathKind=e.target.value;
+  const wr=document.getElementById('pathWidth'); wr.oninput=e=>{ pathWidth=+e.target.value; document.getElementById('pathWval').textContent=e.target.value; };
+  document.getElementById('pathDone').onclick=()=>clearModes();
+}
+function syncTitle(){ const inp=document.getElementById('sceneTitle'); if(inp&&document.activeElement!==inp) inp.value=project.title||''; }
+
+/* ---------- 부팅 ---------- */
+function boot(){
+  project=db.projects.find(p=>p.id===db.activeId)||db.projects[0]; if(!project) project=newProject('상급종합병원 배치안 1');
+  db.activeId=project.id; activeFloorId=project.floors[0]?.id; selectedId=null; focusFloorId=null; hiddenCats.clear();
+  if(project.floorGap==null) project.floorGap=FLOOR_H;
+  if(project.spread==null) project.spread=false;
+  if(project.title==null) project.title='';
+  if(!project.chat) project.chat=[];
+  if(project.showLabels==null) project.showLabels=false;
+  project.floors.forEach(f=>{ if(!f.paths) f.paths=[]; });   // 구버전 마이그레이션
+  undoStack=[]; updateUndoBtn(); clearModes(); switchTab('hist'); initPathBar();
+  if(project.floors.length && project.floors[0].spaces.length===0 && project.history.length===0) seedDemo(project.floors[0]);
+  persist(); rebuildScene(); renderAll();
+}
+function seedDemo(f){ f.name='2층';f.level=2;f.w=44;f.d=30;
+  const D=[['외래 접수·대기','로비·공용',-15,-9,12,8],['외래 진료실 A','외래·진료',-3,-10,8,6],['외래 진료실 B','외래·진료',6,-10,8,6],
+    ['영상검사(CT/MR)','검사·영상',15,-8,10,9],['처치·주사실','외래·진료',-14,4,9,7],['약제부','약제·공급',-2,5,8,6],
+    ['원무·행정','행정·사무',8,5,9,6],['직원 휴게','편의·후생',16,6,8,6]];
+  f.spaces=D.map(([n,c,x,z,w,d])=>({id:uid(),name:n,category:c,shape:'box',x,z,w,d,h:3,memo:''})); }
+boot();
+window.addEventListener('resize',resize);
+</script>
+</body>
+</html>
