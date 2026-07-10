@@ -114,8 +114,8 @@
     <button class="tbtn" id="btnAddFloor">＋층</button>
     <button class="tbtn primary" id="btnAddSpace">＋공간(사각)</button>
     <button class="tbtn" id="btnDraw">✏ 실 외곽선 그리기</button>
-    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📄 PDF 깔기<input type="file" id="pdfInput" accept="application/pdf" class="hidden"></label>
-    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📐 CAD(DXF) 깔기<input type="file" id="cadInput" accept=".dxf,.dwg" class="hidden"></label>
+    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📄 PDF 깔기<input type="file" id="pdfInput" accept="application/pdf" multiple class="hidden"></label>
+    <label class="tbtn" style="display:inline-flex;align-items:center;gap:5px;margin:0;">📐 CAD(DXF) 깔기<input type="file" id="cadInput" accept=".dxf,.dwg" multiple class="hidden"></label>
     <button class="tbtn" id="btnPath">🚶 동선 그리기</button>
     <button class="tbtn" id="btnErase">🧽 지우개</button>
     <button class="tbtn" id="btnLabels" title="도형을 클릭해 선택한 뒤 누르면 그 공간의 이름만 표시됩니다">🏷 명칭표시</button>
@@ -521,13 +521,25 @@ function setBaseline(){ project.baseline={at:Date.now(),floors:JSON.parse(JSON.s
   persist(); alert('현재 배치를 "기준안(Before)"으로 지정했습니다.\n이후 변경분은 [면적 증감표]에서 자동 비교됩니다.'); }
 
 /* ---------- PDF ---------- */
+/* 업로드 도면을 얹을 층 결정: 빈 층(도면·공간 없음)이면 재사용, 아니면 새 층 생성 → 파일마다 층 분리 */
+function floorForUpload(name){
+  let f=getFloor(activeFloorId);
+  if(!f || f.pdf || (f.spaces&&f.spaces.length)){ const mx=project.floors.reduce((m,x)=>Math.max(m,x.level),0); f=makeFloor(mx+1); project.floors.push(f); }
+  if(name) f.name=name;
+  activeFloorId=f.id; return f;
+}
 document.getElementById('pdfInput').addEventListener('change',async e=>{
-  const file=e.target.files[0]; if(!file)return; const f=getFloor(activeFloorId)||project.floors[0]; activeFloorId=f.id;
-  const buf=await file.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(1);
-  const vp=page.getViewport({scale:2}); const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
-  await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; f.pdf=cv.toDataURL('image/png');
-  const ratio=vp.width/vp.height; f.d=30; f.w=Math.round(30*ratio*10)/10; persist(); rebuildScene(); renderAll(); e.target.value='';
-  alert('PDF 도면을 '+f.name+' 바닥에 깔았습니다.\n우측 [층 실치수]에서 실제 가로/세로(m)를 입력해 스케일을 맞춘 뒤,\n[✏ 실 외곽선 그리기]로 도면 위 실 모양을 그대로 따라 그리세요.');
+  const files=[...e.target.files]; e.target.value=''; if(!files.length)return; pushUndo();
+  for(const file of files){
+    const f=floorForUpload(file.name.replace(/\.[^.]+$/,''));
+    try{ const buf=await file.arrayBuffer(); const pdf=await pdfjsLib.getDocument({data:buf}).promise; const page=await pdf.getPage(1);
+      const vp=page.getViewport({scale:2}); const cv=document.createElement('canvas'); cv.width=vp.width; cv.height=vp.height;
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise; f.pdf=cv.toDataURL('image/png');
+      const ratio=vp.width/vp.height; f.d=30; f.w=Math.round(30*ratio*10)/10;
+    }catch(err){ alert(file.name+' 처리 실패: '+err.message); }
+  }
+  persist(); rebuildScene(); renderAll();
+  alert(files.length+'개 PDF 도면을 '+(files.length>1?'각각 새 층으로 나눠 ':'')+'추가했습니다.\n좌측 층 목록에서 파일명으로 층이 구분됩니다.\n우측 [층 실치수]에서 실제 가로/세로(m)를 맞춘 뒤 실을 그리세요.');
 });
 
 /* ============================================================ UI ============================================================ */
@@ -759,11 +771,16 @@ function categorizeName(name){ const n=(name||'').toString(); for(const r of KW)
 
 /* ---------- DXF ---------- */
 document.getElementById('cadInput').addEventListener('change',async e=>{
-  const file=e.target.files[0]; if(!file)return; e.target.value='';
-  if(/\.dwg$/i.test(file.name)){ alert('⚠ DWG는 브라우저에서 직접 열 수 없습니다.\n\nAutoCAD에서 [다른 이름으로 저장 → DXF(*.dxf)] 또는 PDF로 변환 후 업로드해 주세요.\n(DXF로 올리면 실 명칭·면적이 자동 인식됩니다.)'); return; }
-  let text; try{ text=await file.text(); }catch(err){ alert('파일을 읽지 못했습니다.'); return; }
-  let ents; try{ ents=parseDXF(text); }catch(err){ alert('DXF 파싱 실패: '+err.message); return; }
-  applyDXF(ents);
+  const files=[...e.target.files]; e.target.value=''; if(!files.length)return;
+  let added=0;
+  for(const file of files){
+    if(/\.dwg$/i.test(file.name)){ alert('⚠ '+file.name+' — DWG는 브라우저에서 직접 열 수 없습니다.\nAutoCAD에서 [다른 이름으로 저장 → DXF(*.dxf)] 또는 PDF로 변환 후 업로드하세요.'); continue; }
+    let text; try{ text=await file.text(); }catch(err){ alert(file.name+' 읽기 실패'); continue; }
+    let ents; try{ ents=parseDXF(text); }catch(err){ alert(file.name+' DXF 파싱 실패: '+err.message); continue; }
+    const f=floorForUpload(file.name.replace(/\.[^.]+$/,''));
+    if(applyDXF(ents,f,files.length>1)) added++;   // 여러 개면 개별 완료창 생략
+  }
+  if(files.length>1 && added) alert(added+'개 DXF 도면을 각각 새 층으로 나눠 추가했습니다.\n좌측 층 목록에서 파일명으로 층이 구분됩니다.');
 });
 function parseDXF(text){
   const L=text.split(/\r\n|\r|\n/); const P=[];
@@ -887,20 +904,21 @@ function recognizeSpaces(ents,cx,cy,scale,f){
   });
   return count;
 }
-function applyDXF(rawEnts){
+function applyDXF(rawEnts, targetFloor, quiet){
   const ents=stitch(rawEnts); const bb=bboxOf(ents); const wD=bb.maxx-bb.minx, hD=bb.maxy-bb.miny;
-  if(!(wD>0&&hD>0)){ alert('도면 좌표를 찾지 못했습니다. (LINE/POLYLINE 엔티티가 있는 DXF인지 확인)'); return; }
+  if(!(wD>0&&hD>0)){ alert('도면 좌표를 찾지 못했습니다. (LINE/POLYLINE 엔티티가 있는 DXF인지 확인)'); return false; }
   const maxDim=Math.max(wD,hD); const guess=maxDim>1000?'mm':(maxDim>150?'cm':'m');
-  let unit=prompt('도면 단위를 확인하세요 (mm / cm / m)\n도면 최대 치수 ≈ '+Math.round(maxDim)+' 도면단위',guess);
-  if(unit===null) return; unit=unit.trim().toLowerCase(); const scale=unit==='mm'?0.001:unit==='cm'?0.01:1;
+  let unit=prompt((targetFloor?'['+targetFloor.name+'] ':'')+'도면 단위를 확인하세요 (mm / cm / m)\n도면 최대 치수 ≈ '+Math.round(maxDim)+' 도면단위',guess);
+  if(unit===null) return false; unit=unit.trim().toLowerCase(); const scale=unit==='mm'?0.001:unit==='cm'?0.01:1;
   const cx=(bb.minx+bb.maxx)/2, cy=(bb.miny+bb.maxy)/2;
-  const f=getFloor(activeFloorId)||project.floors[0]; activeFloorId=f.id; pushUndo();
+  const f=targetFloor||getFloor(activeFloorId)||project.floors[0]; activeFloorId=f.id; pushUndo();
   f.w=Math.round(wD*scale*10)/10; f.d=Math.round(hD*scale*10)/10; f.pdf=renderDXF(ents,bb);
   buildGuides(ents,cx,cy,scale,f);                 // 스냅용 실선 가이드
   const found=recognizeSpaces(ents,cx,cy,scale,f); // 닫힌 실선 → 3D 자동 생성
   persist(); rebuildScene(); renderAll();
   addMsg('sys','📐 DXF 도면을 '+f.name+'에 적용했습니다.\n· 도면 크기: '+f.w+'m × '+f.d+'m (단위 '+unit+')\n· 실선 윤곽으로 자동 생성된 3D 실: '+found+'개\n· 스냅 꼭짓점 '+((f.guideVerts||[]).length)+'개 (도형을 실선 근처로 옮기면 자동으로 붙습니다)\n좌측 [🗂 공간분류] 탭에서 확인하세요.');
-  alert('✅ DXF 적용 완료\n크기 '+f.w+'×'+f.d+'m · 실선 윤곽 자동 3D 실 '+found+'개\n\n· 도형을 실선 근처로 드래그하면 🧲스냅으로 자동으로 붙습니다.\n· [✏ 실 외곽선 그리기]도 클릭 시 실선 꼭짓점에 붙어 도면을 정확히 따라 그릴 수 있습니다.'+(found===0?'\n\n(자동 3D 0개: 실 경계가 닫힌 실선/폴리라인이 아니거나 단위가 다를 수 있습니다. 이 경우 그리기+스냅으로 따라 그리세요.)':''));
+  if(!quiet) alert('✅ DXF 적용 완료\n크기 '+f.w+'×'+f.d+'m · 실선 윤곽 자동 3D 실 '+found+'개\n\n· 도형을 실선 근처로 드래그하면 🧲스냅으로 자동으로 붙습니다.\n· [✏ 실 외곽선 그리기]도 클릭 시 실선 꼭짓점에 붙어 도면을 정확히 따라 그릴 수 있습니다.'+(found===0?'\n\n(자동 3D 0개: 실 경계가 닫힌 실선/폴리라인이 아니거나 단위가 다를 수 있습니다. 이 경우 그리기+스냅으로 따라 그리세요.)':''));
+  return true;
 }
 
 /* ---------- 공간분류(카테고리) 트리 ---------- */
