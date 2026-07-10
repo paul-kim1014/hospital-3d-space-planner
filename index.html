@@ -155,7 +155,7 @@
     <div class="titleovl"><input id="sceneTitle" placeholder="배치안 제목 입력..." maxlength="60"></div>
     <div class="floorbar"><div class="ttl">층(FLOOR)</div><div id="floorRows"></div></div>
     <div class="legend" id="legend"></div>
-    <div class="hint" id="hint">좌드래그: 이동 · 우드래그: 회전 · 휠: 확대 · 클릭: 선택 · <b>층 더블클릭: 단독 편집(확대)</b></div>
+    <div class="hint" id="hint">좌드래그: 이동 · <b>노란 핸들 드래그: 크기조절</b> · 우드래그: 회전 · 휠: 확대 · 층 더블클릭: 단독 편집</div>
     <div class="drawbar hidden" id="drawbar">✏ 그리기 모드 — 바닥을 클릭해 꼭짓점 추가 <button id="drawDone">완료</button><button id="drawCancel">취소</button></div>
     <div class="pathbar hidden" id="pathbar">🚶 동선 —
       <select id="pathKind"><option>환자</option><option>물류</option><option>직원</option><option>응급</option><option>면회객</option></select>
@@ -240,7 +240,7 @@ function animate(){ resize();
 animate();
 
 function rebuildScene(){
-  worldRoot.clear(); spaceMeshes.clear(); floorGroups.clear(); pathMeshes.clear();
+  worldRoot.clear(); spaceMeshes.clear(); floorGroups.clear(); pathMeshes.clear(); handleMeshes.length=0;
   if(!project) return;
   const gap=(project.floorGap==null?FLOOR_H:project.floorGap);
   if(focusFloorId){                       // 단독 편집(포커스) 모드
@@ -273,6 +273,7 @@ function buildFloorGroup(f,y,ghost){
   }); }
   // 동선(경로) 렌더
   if(!ghost && f.paths) f.paths.forEach(pa=>g.add(buildPathMesh(f,pa)));
+  if(!ghost) addResizeHandles(g,f);   // 선택 도형 크기조절 핸들
   return g;
 }
 /* 동선 튜브 */
@@ -358,6 +359,16 @@ function finishDraw(){
 /* ---------- 픽킹 & 드래그 ---------- */
 const ray=new THREE.Raycaster(), ptr=new THREE.Vector2();
 let dragging=null; const dragPlane=new THREE.Plane(); let dragStart=new THREE.Vector3(), meshStart=new THREE.Vector3();
+let resizing=null; const handleMeshes=[];
+/* 선택 도형의 크기조절 핸들 */
+function makeHandle(){ return new THREE.Mesh(new THREE.BoxGeometry(0.9,0.9,0.9),new THREE.MeshBasicMaterial({color:0xffd166})); }
+function addResizeHandles(g,f){ if(!selectedId) return; const s=f.spaces.find(x=>x.id===selectedId); if(!s) return;
+  const top=(s.h||3)+0.15;
+  if(s.shape==='poly'){ let mx=-1e9,mz=-1e9; s.points.forEach(p=>{ if(p[0]>mx)mx=p[0]; if(p[1]>mz)mz=p[1]; });
+    const m=makeHandle(); m.position.set(mx,top,mz); m.userData={resize:true,spaceId:s.id,poly:true}; g.add(m); handleMeshes.push(m); }
+  else { [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([sx,sz])=>{ const m=makeHandle(); m.position.set(s.x+sx*s.w/2,top,s.z+sz*s.d/2);
+    m.userData={resize:true,spaceId:s.id,sx,sz}; g.add(m); handleMeshes.push(m); }); }
+}
 function setPtr(e){ const r=canvas.getBoundingClientRect(); ptr.x=((e.clientX-r.left)/r.width)*2-1; ptr.y=-((e.clientY-r.top)/r.height)*2+1; }
 
 function floorPlanePoint(){ const g=floorGroups.get(activeFloorId); const pl=new THREE.Plane(new THREE.Vector3(0,1,0),-(g?g.position.y:0));
@@ -368,6 +379,8 @@ canvas.addEventListener('pointerdown',e=>{
   if(eraseMode){ const hit=ray.intersectObjects([...pathMeshes.values()],false);
     if(hit.length){ const m=hit[0].object; const f=getFloor(m.userData.floorId); if(f){ pushUndo(); f.paths=f.paths.filter(p=>p.id!==m.userData.pathId); persist(); rebuildScene(); } } return; }
   if(pathMode){ const pt=floorPlanePoint(); if(pt){ curPath={id:uid(),kind:pathKind,color:pathColor,width:pathWidth,pts:[pt]}; pathCapturing=true; controls.enabled=false; updatePathPreview(); } return; }
+  const hh=ray.intersectObjects(handleMeshes,false);   // 크기조절 핸들 우선
+  if(hh.length){ startResize(hh[0].object); return; }
   const hits=ray.intersectObjects([...spaceMeshes.values()],false);
   if(hits.length){
     const m=hits[0].object; selectSpace(m.userData.spaceId);
@@ -380,7 +393,23 @@ canvas.addEventListener('pointerdown',e=>{
     if(!slabHit.length) selectSpace(null); else { activeFloorId=slabHit[0].object.userData.floorId; rebuildScene(); renderAll(); }
   }
 });
+function startResize(m){ const u=m.userData; const s=getSpace(u.spaceId); const f=spaceFloor(u.spaceId); if(!s||!f) return;
+  selectSpace(u.spaceId); const mesh=spaceMeshes.get(s.id); controls.enabled=false;
+  if(u.poly){ const c=polyCentroid(s.points); const sd=Math.hypot(m.position.x-c[0],m.position.z-c[1])||1;
+    resizing={type:'poly',s,f,mesh,c,orig:s.points.map(p=>p.slice()),startDist:sd,fac:1}; }
+  else { const fx=s.x-u.sx*s.w/2, fz=s.z-u.sz*s.d/2;
+    resizing={type:'box',s,f,mesh,fx,fz,origW:s.w,origD:s.d,w:s.w,d:s.d,cx:s.x,cz:s.z}; }
+}
 canvas.addEventListener('pointermove',e=>{
+  if(resizing){ setPtr(e); ray.setFromCamera(ptr,camera); let p=floorPlanePoint(); if(!p) return;
+    if(snapOn){ p=snapSinglePoint(resizing.f,p[0],p[1]); }
+    if(resizing.type==='box'){ const w=Math.max(1,Math.abs(p[0]-resizing.fx)), d=Math.max(1,Math.abs(p[1]-resizing.fz));
+      const cx=(p[0]+resizing.fx)/2, cz=(p[1]+resizing.fz)/2;
+      resizing.mesh.scale.set(w/resizing.origW,1,d/resizing.origD); resizing.mesh.position.x=cx; resizing.mesh.position.z=cz;
+      resizing.w=w; resizing.d=d; resizing.cx=cx; resizing.cz=cz; }
+    else { const c=resizing.c; const fac=Math.max(0.2,Math.hypot(p[0]-c[0],p[1]-c[1])/resizing.startDist);
+      resizing.mesh.scale.set(fac,1,fac); resizing.mesh.position.set(c[0]*(1-fac),0,c[1]*(1-fac)); resizing.fac=fac; }
+    return; }
   if(pathCapturing){ setPtr(e); ray.setFromCamera(ptr,camera); const pt=floorPlanePoint();
     if(pt){ const last=curPath.pts[curPath.pts.length-1]; if(Math.hypot(pt[0]-last[0],pt[1]-last[1])>0.8){ curPath.pts.push(pt); updatePathPreview(); } } return; }
   if(!dragging) return; setPtr(e); ray.setFromCamera(ptr,camera);
@@ -407,6 +436,10 @@ canvas.addEventListener('dblclick',e=>{
   if(fh.length) focusFloor(fh[0].object.userData.floorId);
 });
 window.addEventListener('pointerup',()=>{
+  if(resizing){ controls.enabled=true; pushUndo(); const s=resizing.s;
+    if(resizing.type==='box'){ s.w=Math.round(resizing.w*100)/100; s.d=Math.round(resizing.d*100)/100; s.x=Math.round(resizing.cx*100)/100; s.z=Math.round(resizing.cz*100)/100; }
+    else { const fac=resizing.fac||1, c=resizing.c; s.points=resizing.orig.map(p=>[Math.round((c[0]+fac*(p[0]-c[0]))*100)/100, Math.round((c[1]+fac*(p[1]-c[1]))*100)/100]); }
+    resizing=null; persist(); rebuildScene(); renderRight(); return; }
   if(pathCapturing){ pathCapturing=false; controls.enabled=true; drawHelper.clear();
     if(curPath && curPath.pts.length>=2){ const f=getFloor(activeFloorId); if(f){ pushUndo(); (f.paths=f.paths||[]).push(curPath); persist(); rebuildScene(); } }
     curPath=null; return; }
@@ -415,8 +448,9 @@ window.addEventListener('pointerup',()=>{
   const dx=dragging.mesh.position.x-meshStart.x, dz=dragging.mesh.position.z-meshStart.z;
   if(Math.abs(dx)>0.01||Math.abs(dz)>0.01) pushUndo();
   const s=dragging.space, f=dragging.floor;
+  // 도면 바깥에도 자유롭게 배치 (경계 제한 없음)
   if(s.shape==='poly'){ s.points=s.points.map(p=>[Math.round((p[0]+dx)*100)/100,Math.round((p[1]+dz)*100)/100]); }
-  else { s.x=clamp(Math.round((s.x+dx)*100)/100,-f.w/2+s.w/2,f.w/2-s.w/2); s.z=clamp(Math.round((s.z+dz)*100)/100,-f.d/2+s.d/2,f.d/2-s.d/2); }
+  else { s.x=Math.round((s.x+dx)*100)/100; s.z=Math.round((s.z+dz)*100)/100; }
   dragging=null; controls.enabled=true; persist(); rebuildScene(); renderRight();
 });
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
